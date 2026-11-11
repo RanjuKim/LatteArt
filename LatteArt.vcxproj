@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <ProjectGuid>{442ECB9B-F236-40E6-9445-B11EC8531E97}</ProjectGuid>
+    <RootNamespace>LatteArt</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="opencv.props" />
+  </ImportGroup>
+  <PropertyGroup>
+    <OutDir>$(SolutionDir)bin\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)build\$(Configuration)\</IntDir>
+    <LocalDebuggerWorkingDirectory>$(SolutionDir)</LocalDebuggerWorkingDirectory>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(ProjectDir)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_USE_MATH_DEFINES;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
+    <ClCompile>
+      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
+    <ClCompile>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="src\core\types.h" />
+    <ClInclude Include="src\core\todo.h" />
+    <ClInclude Include="src\io\io.h" />
+    <ClInclude Include="src\basic\color.h" />
+    <ClInclude Include="src\basic\filter.h" />
+    <ClInclude Include="src\basic\edge.h" />
+    <ClInclude Include="src\basic\threshold.h" />
+    <ClInclude Include="src\basic\morphology.h" />
+    <ClInclude Include="src\basic\fft.h" />
+    <ClInclude Include="src\basic\geometry.h" />
+    <ClInclude Include="src\normalize\normalize.h" />
+    <ClInclude Include="src\structure\structure.h" />
+    <ClInclude Include="src\quality\quality.h" />
+    <ClInclude Include="src\scoring\scoring.h" />
+    <ClInclude Include="src\viz\report.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\io\io.cpp" />
+    <ClCompile Include="src\basic\color.cpp" />
+    <ClCompile Include="src\basic\filter.cpp" />
+    <ClCompile Include="src\basic\edge.cpp" />
+    <ClCompile Include="src\basic\threshold.cpp" />
+    <ClCompile Include="src\basic\morphology.cpp" />
+    <ClCompile Include="src\basic\fft.cpp" />
+    <ClCompile Include="src\basic\geometry.cpp" />
+    <ClCompile Include="src\normalize\normalize.cpp" />
+    <ClCompile Include="src\structure\segment.cpp" />
+    <ClCompile Include="src\structure\layers.cpp" />
+    <ClCompile Include="src\quality\contrast.cpp" />
+    <ClCompile Include="src\quality\shape.cpp" />
+    <ClCompile Include="src\quality\texture.cpp" />
+    <ClCompile Include="src\quality\position_size.cpp" />
+    <ClCompile Include="src\quality\quality.cpp" />
+    <ClCompile Include="src\scoring\scoring.cpp" />
+    <ClCompile Include="src\viz\report.cpp" />
+    <ClCompile Include="src\app\main.cpp" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

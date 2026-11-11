@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  OpenCV location comes from environment variables so each team member can
+  install OpenCV anywhere:
+    OPENCV_DIR  e.g. C:\opencv\build         (folder containing include\ and x64\)
+    OPENCV_VER  e.g. 4120 for OpenCV 4.12.0  (suffix of opencv_worldXXXX.lib)
+    OPENCV_VC   e.g. vc16                    (folder name under x64\)
+  The defaults below apply when a variable is not set.
+  After changing an environment variable, restart Visual Studio.
+-->
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="UserMacros">
+    <OpenCvDir Condition="'$(OPENCV_DIR)' != ''">$(OPENCV_DIR)</OpenCvDir>
+    <OpenCvDir Condition="'$(OpenCvDir)' == ''">C:\opencv\build</OpenCvDir>
+    <OpenCvVer Condition="'$(OPENCV_VER)' != ''">$(OPENCV_VER)</OpenCvVer>
+    <OpenCvVer Condition="'$(OpenCvVer)' == ''">4120</OpenCvVer>
+    <OpenCvVc Condition="'$(OPENCV_VC)' != ''">$(OPENCV_VC)</OpenCvVc>
+    <OpenCvVc Condition="'$(OpenCvVc)' == ''">vc16</OpenCvVc>
+    <OpenCvSuffix Condition="'$(Configuration)' == 'Debug'">d</OpenCvSuffix>
+    <OpenCvLib>opencv_world$(OpenCvVer)$(OpenCvSuffix)</OpenCvLib>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(OpenCvDir)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(OpenCvDir)\x64\$(OpenCvVc)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>$(OpenCvLib).lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <PostBuildEvent>
+      <Command>xcopy /y /d "$(OpenCvDir)\x64\$(OpenCvVc)\bin\$(OpenCvLib).dll" "$(OutDir)"</Command>
+      <Message>Copy $(OpenCvLib).dll next to LatteArt.exe</Message>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+</Project>

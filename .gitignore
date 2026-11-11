@@ -1,0 +1,30 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.VC.db
+*.VC.opendb
+*.aps
+ipch/
+
+# Build output (included in the submission zip, not in git)
+bin/
+build/
+x64/
+Debug/
+Release/
+
+# Runtime output
+result*.png
+out*.png
+eval/*.csv
+
+# Photos (share through the team drive; only small samples go in git)
+data/user/*
+!data/user/README.md
+data/raw/
+
+# Submission archives and course handouts
+*.zip
+2026_Image_Processing_TeamProject02.pdf
+Practice_00_CxImage*.pdf
