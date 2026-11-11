@@ -118,7 +118,7 @@ Quality weights (draft, to be tuned with data): contrast 30% · shape 25% · tex
 ### Cecelia Hein's tasks (non-development)
 - Write the **shooting guide** (English/Korean): shoot straight down, no shadows, whole cup visible
 - **Get the reference photos**: expert heart and tulip (barista contacts, cafés)
-- **Collect 30–40 practice photos** and record the **true layer count** of each in `data/labels.csv`
+- **Collect about 10 practice photos** (mix of heart and tulip, including cups that hit and miss the target layer count) and record the **true layer count** of each in `data/labels.csv`
 - **Make `--canon` images**: read the cup center (cx, cy) and radius (r) in Paint and run the exe (uses a built exe, no coding)
 - **Run the blind rating**: recruit 3 raters, prepare the rating sheet, collect scores
 - **Meeting records**: KakaoTalk captures and meeting photos in `docs/meetings/` (report section 4)
@@ -134,14 +134,13 @@ Quality weights (draft, to be tuned with data): contrast 30% · shape 25% · tex
 | Date | Deliverable | From → To |
 |---|---|---|
 | **Nov 13** | `gaussianBlur`, `convolve2D` | Junkyu → Jaeku (Canny), Ranju (segmentation, LoG) |
-| **Nov 14** | `--canon` images of 2 reference + 10 practice photos | Cecelia → Ranju, Junkyu |
+| **Nov 14** | 2 reference + about 10 practice photos (originals, `--canon` images, true layer counts) | Cecelia → the three developers |
 | **Nov 15** | `segmentPattern` | Ranju → Jaeku (pattern-axis PCA) |
 | **Nov 17** | `fft`, `magnitudeSpectrum` | Ranju → Jaeku (layer cross-check) |
 | **Nov 17** | `normalizeCup` | Jaeku → everyone |
 | **Nov 22** | `analyzeLayers` | Jaeku → Junkyu (result image) |
-| **Nov 22** | 30–40 photos + true layer counts | Cecelia → Junkyu (batch) |
-| **Nov 24** | Batch result CSV | Junkyu → Jaeku, Ranju (tuning) |
-| **Nov 25** | Human rating scores | Cecelia → Junkyu (correlation) |
+| **Nov 24** | Batch result CSV | Junkyu → Jaeku, Ranju (threshold check) |
+| **Nov 21** | Human rating scores (10 photos) | Cecelia → Junkyu (comparison) |
 
 ### Jaeku Kang
 
@@ -151,7 +150,7 @@ Quality weights (draft, to be tuned with data): contrast 30% · shape 25% · tex
 | Nov 15 – 17 | `findRimPoints`, `fitEllipse`, `normalizeCup` (ellipse → circle, scale), `patternAxisAngleDeg` | 10 photos normalized to 512 automatically |
 | Nov 18 – 21 | `axisProfile`, `findPeaks`, spacing/thickness CV, FFT cross-check, U | Target layer count detected on reference photos |
 | Nov 22 | Wire `pipeline` end to end | Two photos → final score printed |
-| Nov 23 – 26 | Tune prominence and other thresholds from batch results, fix bugs | Layer-count accuracy measured |
+| Nov 23 – 26 | Check prominence and other thresholds against batch results, fix bugs | Layer-count accuracy on the 10 photos checked |
 
 ### Ranju Kim
 
@@ -162,7 +161,7 @@ Quality weights (draft, to be tuned with data): contrast 30% · shape 25% · tex
 | Nov 15 – 17 | `fft`, `magnitudeSpectrum` (→ Jaeku), `evalSize`, `evalPosition` | Size and position scores printed |
 | Nov 18 – 20 | `fft2Magnitude`, `evalContrast` (Michelson, edge width, high-frequency ratio) | Contrast score printed |
 | Nov 20 – 22 | `evalShape` (mirror IoU, Hu), `evalTexture` (GLCM, LoG, highlights) | All 5 item scores + feedback sentences |
-| Nov 23 – 26 | Tune σ and weights, polish feedback sentences | Scores move in the same direction as human ratings |
+| Nov 23 – 26 | Sanity-check σ and weights (little data, so no big changes), polish feedback sentences | Ranking agrees in direction with human ratings |
 
 ### Junkyu Kim
 
@@ -173,16 +172,16 @@ Quality weights (draft, to be tuned with data): contrast 30% · shape 25% · tex
 | Nov 18 – 20 | `drawText` (5×7 bitmap font), `sideBySide`, polish `printReport` | Score text shown on the image |
 | Nov 21 – 22 | `renderResult` (axis, layer positions, problem areas) | Result image saved |
 | Nov 22 – 24 | `runBatch` (labels.csv → result CSV) | Whole dataset scored in one run |
-| Nov 25 – 26 | Correlation with human ratings (Spearman, Excel is fine), layer-count accuracy table | Numbers for the report |
+| Nov 25 – 26 | Compare with human ratings (ranking of the 10 photos, Spearman as a reference value), layer-count accuracy table | Numbers for the report |
 
 ### Cecelia Hein
 
 | Dates | Tasks | Done when |
 |---|---|---|
 | Nov 12 – 13 | Shooting guide, rating sheet template | Shared in the group chat |
-| Nov 12 – 14 | Reference photos (heart, tulip), 10 practice photos + `--canon` images | **Handed over Nov 14** |
-| Nov 15 – 22 | Collect 30–40 photos, record true layer counts | **Handed over Nov 22** |
-| Nov 20 – 25 | Blind rating (3 raters) | **Handed over Nov 25** |
+| Nov 12 – 14 | Reference photos (heart, tulip), **collect about 10 practice photos**, record true layer counts, `--canon` images | **Handed over Nov 14** |
+| Nov 15 – 19 | Retake photos that are blurry or too tilted, get 2–3 extra photos for the live demo | By Nov 19 |
+| Nov 15 – 21 | Blind rating (3 raters, 10 photos) | **Handed over Nov 21** |
 | Nov 23 – 28 | Report draft (sections 1, 3, 4, 5, 6), slide draft, market research update | Drafts shared |
 | Nov 29 – Dec 1 | Shoot and edit demo video, assemble and submit report and slides | Both zips submitted |
 | Ongoing | Meeting records and chat captures | `docs/meetings/` |
@@ -200,7 +199,7 @@ Quality weights (draft, to be tuned with data): contrast 30% · shape 25% · tex
 ### Milestones
 - **Nov 17**: automatic normalization done
 - **Nov 22**: two photos + pattern in → final score and result image out
-- **Nov 26**: tuning done, failure cases collected
+- **Nov 26**: threshold check done, failure cases collected
 - **Nov 27**: first version of the Src zip prepared in advance
 
 ---
@@ -230,7 +229,8 @@ Quality weights (draft, to be tuned with data): contrast 30% · shape 25% · tex
 | Gaussian (Nov 13) is late, blocking Canny and segmentation | Junkyu's top priority. If late, use a temporary 3×3 box filter inside your selftest |
 | Automatic normalization (Nov 17) is late | Quality and result-image work continue on `--canon` images |
 | Ellipse fitting / homography are hard to implement | If behind schedule, reduce scope to "ask for a retake when the photo is heavily tilted" (already stated in the proposal) |
-| Photos or ratings arrive late | Check Cecelia's hand-off dates (Nov 14, 22, 25) daily in the group chat |
+| Photos or ratings arrive late | Check Cecelia's hand-off dates (Nov 14, 21) daily in the group chat |
+| Only about 10 photos | Keep the draft weights from the proposal, no big changes. Make sure some of the 10 cups miss the target layer count. State the sample size under "limitations" in the report |
 | Integration conflicts | File-level ownership, SHARED files need everyone's approval, keep `main` always building |
 | Build fails on the grader's PC | On Nov 27, unzip on another PC, clean build and run |
 | Breaking the library rule | Check script before every merge; record any exception and our contribution in the report |
