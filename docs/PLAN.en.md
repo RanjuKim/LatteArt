@@ -116,11 +116,10 @@ Quality weights (draft, to be tuned with data): contrast 30% · shape 25% · tex
 | **Cecelia Hein** | Result-image drawing functions · data collection · rating sessions · documents · presentation | `viz/draw`, `debug/viz.cpp`, `data/`, `docs/` |
 
 ### Cecelia Hein's tasks
-- **Drawing functions for the result image** (`src/viz/draw.cpp`): rectangle and cross → side-by-side images → text (5×7 font) → line and circle. Each function has step-by-step instructions in its comments. Check the result with `--debug viz`. If line and circle are too hard, hand them to Junkyu
+- **Drawing functions for the result image** (`src/viz/draw.cpp`): rectangle and cross → side-by-side images → text (5×7 font) → line and circle. Each function has step-by-step instructions in its comments. Check the result with `--debug viz`
 - **Get the reference photos**: expert heart and tulip
 - **Collect about 10 practice photos** (mix of heart and tulip, including cups that hit and miss the target layer count) and record the **true layer count** of each in `data/labels.csv`
 - **Make `--canon` images**: read the cup center (cx, cy) and radius (r) in Paint and run the exe
-- **Run the blind rating**: recruit 3 raters, collect scores
 - **Meeting records**: KakaoTalk captures and meeting photos in `docs/meetings/` (report section 4)
 - Update **market and competitor research**, business plan
 - **Assemble the report** (sections 1, 3, 4, 5, 6), **slides**, shoot and edit the **demo video**, English proofreading, run the rehearsal
@@ -141,7 +140,6 @@ Quality weights (draft, to be tuned with data): contrast 30% · shape 25% · tex
 | **Nov 17** | `normalizeCup` | Jaeku → everyone |
 | **Nov 22** | `analyzeLayers` | Jaeku → Junkyu (result image) |
 | **Nov 24** | Batch result CSV | Junkyu → Jaeku, Ranju (threshold check) |
-| **Nov 21** | Human rating scores (10 photos) | Cecelia → Junkyu (comparison) |
 
 ### Jaeku Kang
 
@@ -162,7 +160,7 @@ Quality weights (draft, to be tuned with data): contrast 30% · shape 25% · tex
 | Nov 15 – 17 | `fft`, `magnitudeSpectrum` (→ Jaeku), `evalSize`, `evalPosition` | Size and position scores printed |
 | Nov 18 – 20 | `fft2Magnitude`, `evalContrast` (Michelson, edge width, high-frequency ratio) | Contrast score printed |
 | Nov 20 – 22 | `evalShape` (mirror IoU, Hu), `evalTexture` (GLCM, LoG, highlights) | All 5 item scores + feedback sentences |
-| Nov 23 – 26 | Sanity-check σ and weights (little data, so no big changes), polish feedback sentences | Ranking agrees in direction with human ratings |
+| Nov 23 – 26 | Sanity-check σ and weights (little data, so no big changes), polish feedback sentences | Clean cups with the right layer count get high quality scores |
 
 ### Junkyu Kim
 
@@ -173,7 +171,7 @@ Quality weights (draft, to be tuned with data): contrast 30% · shape 25% · tex
 | Nov 18 – 20 | Polish `printReport`, prepare `runBatch` (read labels.csv) | Console report finished |
 | Nov 21 – 22 | `renderResult` (axis, layer positions, problem areas, using Cecelia's drawing functions) | Result image saved |
 | Nov 22 – 24 | `runBatch` (labels.csv → result CSV) | Whole dataset scored in one run |
-| Nov 25 – 26 | Compare with human ratings (ranking of the 10 photos, Spearman as a reference value), layer-count accuracy table | Numbers for the report |
+| Nov 25 – 26 | Layer-count accuracy table (detected vs true), failure cases | Numbers for the report |
 
 ### Cecelia Hein
 
@@ -182,9 +180,7 @@ Quality weights (draft, to be tuned with data): contrast 30% · shape 25% · tex
 | Nov 12 – 13 | Set up the dev environment (see README), `drawRect`, `drawCross` | Rectangle and cross shown by `--debug viz` |
 | Nov 12 – 14 | Reference photos (heart, tulip), **collect about 10 practice photos**, record true layer counts, `--canon` images | **Handed over Nov 14** |
 | Nov 15 – 17 | `sideBySide`, `drawText` (type in the 5×7 font table) | Two cups side by side, score text shown |
-| Nov 18 – 20 | `drawLine`, `drawCircle` (hand to Junkyu if stuck) | **Handed over Nov 20** |
-| Nov 15 – 19 | Retake photos that are blurry or too tilted, get 2–3 extra photos for the live demo | By Nov 19 |
-| Nov 15 – 21 | Blind rating (3 raters, 10 photos) | **Handed over Nov 21** |
+| Nov 18 – 20 | `drawLine`, `drawCircle` | **Handed over Nov 20** |
 | Nov 23 – 28 | Report draft (sections 1, 3, 4, 5, 6), slide draft, market research update | Drafts shared |
 | Nov 29 – Dec 1 | Shoot and edit demo video, assemble and submit report and slides | Both zips submitted |
 | Ongoing | Meeting records and chat captures | `docs/meetings/` |
@@ -232,7 +228,7 @@ Quality weights (draft, to be tuned with data): contrast 30% · shape 25% · tex
 | Gaussian (Nov 13) is late, blocking Canny and segmentation | Junkyu's top priority. If late, use a temporary 3×3 box filter inside your debug file |
 | Automatic normalization (Nov 17) is late | Quality and result-image work continue on `--canon` images |
 | Ellipse fitting / homography are hard to implement | If behind schedule, reduce scope to "ask for a retake when the photo is heavily tilted" (already stated in the proposal) |
-| Photos or ratings arrive late | Check Cecelia's hand-off dates (Nov 14, 21) daily in the group chat |
+| Photos arrive late | Check Cecelia's hand-off date (Nov 14) in the group chat |
 | Only about 10 photos | Keep the draft weights from the proposal, no big changes. Make sure some of the 10 cups miss the target layer count. State the sample size under "limitations" in the report |
 | Integration conflicts | File-level ownership, SHARED files need everyone's approval, keep `main` always building |
 | Build fails on the grader's PC | On Nov 27, unzip on another PC, clean build and run |

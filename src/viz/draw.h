@@ -31,7 +31,7 @@ cv::Mat sideBySide(const cv::Mat& a, const cv::Mat& b, int gap = 8);
 // Step 3 (easy, mostly typing the font table)
 void drawText(cv::Mat& img, cv::Point origin, const std::string& text, Color c, int scale = 2);
 
-// Step 4 (medium - hand over to Junkyu if stuck)
+// Step 4 (medium)
 void drawLine(cv::Mat& img, cv::Point a, cv::Point b, Color c, int thickness = 1);
 void drawCircle(cv::Mat& img, cv::Point center, int radius, Color c, int thickness = 1);
 
