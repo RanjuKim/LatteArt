@@ -1,7 +1,7 @@
 # LatteArt 개발 계획
 
 Team 22 · 영상처리 Team Project 02 (Global / Startup 팀)
-작성: 2026-11-11 · 원래 기획서는 [Team22_LatteArt_Plan.docx](Team22_LatteArt_Plan.docx) 참고
+작성: 2026-11-11 · 원래 기획서는 [Team22_LatteArt_Plan.docx](Team22_LatteArt_Plan.docx) 참고 · English: [PLAN.en.md](PLAN.en.md)
 
 ---
 
