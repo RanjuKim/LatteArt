@@ -116,11 +116,10 @@ Quality weights (draft, to be tuned with data): contrast 30% · shape 25% · tex
 | **Cecelia Hein** | Data collection · rating sessions · documents · presentation | `data/`, `docs/` |
 
 ### Cecelia Hein's tasks
-- Write the **shooting guide**: shoot straight down, no shadows, whole cup visible
 - **Get the reference photos**: expert heart and tulip
 - **Collect about 10 practice photos** (mix of heart and tulip, including cups that hit and miss the target layer count) and record the **true layer count** of each in `data/labels.csv`
 - **Make `--canon` images**: read the cup center (cx, cy) and radius (r) in Paint and run the exe
-- **Run the blind rating**: recruit 3 raters, prepare the rating sheet, collect scores
+- **Run the blind rating**: recruit 3 raters, collect scores
 - **Meeting records**: KakaoTalk captures and meeting photos in `docs/meetings/` (report section 4)
 - Update **market and competitor research**, business plan
 - **Assemble the report** (sections 1, 3, 4, 5, 6), **slides**, shoot and edit the **demo video**, English proofreading, run the rehearsal
@@ -178,7 +177,6 @@ Quality weights (draft, to be tuned with data): contrast 30% · shape 25% · tex
 
 | Dates | Tasks | Done when |
 |---|---|---|
-| Nov 12 – 13 | Shooting guide, rating sheet template | Shared in the group chat |
 | Nov 12 – 14 | Reference photos (heart, tulip), **collect about 10 practice photos**, record true layer counts, `--canon` images | **Handed over Nov 14** |
 | Nov 15 – 19 | Retake photos that are blurry or too tilted, get 2–3 extra photos for the live demo | By Nov 19 |
 | Nov 15 – 21 | Blind rating (3 raters, 10 photos) | **Handed over Nov 21** |
@@ -225,7 +223,7 @@ Quality weights (draft, to be tuned with data): contrast 30% · shape 25% · tex
 
 | Risk | Mitigation |
 |---|---|
-| **Layer-count accuracy** (core of the project) | Control input quality with a shooting guide (shoot straight down, no shadows, whole cup visible). This helps more than algorithm tweaks |
+| **Layer-count accuracy** (core of the project) | When choosing photos, prefer ones shot straight down, without shadows, with the whole cup visible. This helps more than algorithm tweaks |
 | Gaussian (Nov 13) is late, blocking Canny and segmentation | Junkyu's top priority. If late, use a temporary 3×3 box filter inside your debug file |
 | Automatic normalization (Nov 17) is late | Quality and result-image work continue on `--canon` images |
 | Ellipse fitting / homography are hard to implement | If behind schedule, reduce scope to "ask for a retake when the photo is heavily tilted" (already stated in the proposal) |
