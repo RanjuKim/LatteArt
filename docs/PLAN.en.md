@@ -76,7 +76,7 @@ Two photos (reference, user) + target pattern (e.g. tulip:3)
 | `LatteArt.exe <ref.jpg> <mine.jpg> tulip:3 [result.png]` | Scoring (the final program) |
 | `LatteArt.exe --canon <photo> <cx> <cy> <r> <out.png>` | **Manual normalization** (done). Read the cup center and radius in Paint and get a 512 canonical image |
 | `LatteArt.exe --debug <stage> ...` | **Per-stage debug mode.** Runs one stage and saves intermediate results as `debug_<stage>_*.png`. Stages: `preprocess` (Junkyu), `normalize` · `layers` (Jaeku), `segment` · `quality` (Ranju), `viz` (Cecelia). Each `src/debug/<stage>.cpp` is edited only by that stage's owner. Also used to show intermediate results in the report and demo |
-| `LatteArt.exe --batch ...` | Score the whole dataset → CSV (Junkyu) |
+| `LatteArt.exe --batch <labels.csv> <photo_dir> <out.csv>` | Score the whole dataset → result CSV and layer-count accuracy (Cecelia). Reference photo: `data/reference/<pattern><layers>.jpg` (e.g. `tulip3.jpg`) |
 
 ### Normalization contract (shared by all modules)
 - A normalized cup image is **512 × 512**
@@ -112,11 +112,12 @@ Quality weights (draft, to be tuned with data): contrast 30% · shape 25% · tex
 |---|---|---|
 | **Jaeku Kang** | Normalization · layer count · scoring · wiring the pipeline | `basic/edge`, `basic/geometry`, `normalize/*`, `structure/layers`, `scoring/*`, `app/pipeline`, `debug/normalize.cpp`, `debug/layers.cpp` |
 | **Ranju Kim** | Pattern segmentation · five quality metrics · FFT | `basic/threshold`, `basic/morphology`, `basic/fft`, `structure/segment`, `quality/*`, `debug/segment.cpp`, `debug/quality.cpp` |
-| **Junkyu Kim** | Basic filters · color conversion · result output · batch validation | `basic/filter`, `basic/color`, `basic/clahe`, `viz/report`, `app/batch`, `debug/preprocess.cpp` |
-| **Cecelia Hein** | Result-image drawing functions · data collection · rating sessions · documents · presentation | `viz/draw`, `debug/viz.cpp`, `data/`, `docs/` |
+| **Junkyu Kim** | Basic filters · color conversion · result output · accuracy analysis | `basic/filter`, `basic/color`, `basic/clahe`, `viz/report`, `debug/preprocess.cpp` |
+| **Cecelia Hein** | Result-image drawing functions · batch scoring · data collection · documents · presentation | `viz/draw`, `debug/viz.cpp`, `app/batch`, `data/`, `docs/` |
 
 ### Cecelia Hein's tasks
 - **Drawing functions for the result image** (`src/viz/draw.cpp`): rectangle and cross → side-by-side images → text (5×7 font) → line and circle. Each function has step-by-step instructions in its comments. Check the result with `--debug viz`
+- **Batch scoring** (`src/app/batch.cpp`): read `labels.csv`, score each photo, write the result CSV and print the layer-count accuracy. Step-by-step instructions are in the comments. Until the pipeline is finished, each row recording a TODO error is expected
 - **Get the reference photos**: expert heart and tulip
 - **Collect about 10 practice photos** (mix of heart and tulip, including cups that hit and miss the target layer count) and record the **true layer count** of each in `data/labels.csv`
 - **Make `--canon` images**: read the cup center (cx, cy) and radius (r) in Paint and run the exe
@@ -139,7 +140,7 @@ Quality weights (draft, to be tuned with data): contrast 30% · shape 25% · tex
 | **Nov 17** | `fft`, `magnitudeSpectrum` | Ranju → Jaeku (layer cross-check) |
 | **Nov 17** | `normalizeCup` | Jaeku → everyone |
 | **Nov 22** | `analyzeLayers` | Jaeku → Junkyu (result image) |
-| **Nov 24** | Batch result CSV | Junkyu → Jaeku, Ranju (threshold check) |
+| **Nov 24** | Batch result CSV | Cecelia → Jaeku, Ranju (threshold check), Junkyu (accuracy table) |
 
 ### Jaeku Kang
 
@@ -168,9 +169,9 @@ Quality weights (draft, to be tuned with data): contrast 30% · shape 25% · tex
 |---|---|---|
 | **Nov 12 – 13** | ★ **`gaussianBlur`, `convolve2D` first** → merge to main right away | Others can use them |
 | Nov 14 – 17 | `bgrToLab`, `clahe` | Results saved via `--debug preprocess` |
-| Nov 18 – 20 | Polish `printReport`, prepare `runBatch` (read labels.csv) | Console report finished |
+| Nov 18 – 20 | Polish `printReport` | Console report finished |
 | Nov 21 – 22 | `renderResult` (axis, layer positions, problem areas, using Cecelia's drawing functions) | Result image saved |
-| Nov 22 – 24 | `runBatch` (labels.csv → result CSV) | Whole dataset scored in one run |
+| Nov 23 – 24 | Polish the result image, fix bugs | Result image ready for the demo |
 | Nov 25 – 26 | Layer-count accuracy table (detected vs true), failure cases | Numbers for the report |
 
 ### Cecelia Hein
@@ -181,7 +182,8 @@ Quality weights (draft, to be tuned with data): contrast 30% · shape 25% · tex
 | Nov 12 – 14 | Reference photos (heart, tulip), **collect about 10 practice photos**, record true layer counts, `--canon` images | **Handed over Nov 14** |
 | Nov 15 – 17 | `sideBySide`, `drawText` (type in the 5×7 font table) | Two cups side by side, score text shown |
 | Nov 18 – 20 | `drawLine`, `drawCircle` | **Handed over Nov 20** |
-| Nov 23 – 28 | Report draft (sections 1, 3, 4, 5, 6), slide draft, market research update | Drafts shared |
+| Nov 21 – 24 | `runBatch`: read labels.csv → score each photo → write result CSV → print accuracy summary | **Handed over Nov 24** |
+| Nov 25 – 28 | Report draft (sections 1, 3, 4, 5, 6), slide draft, market research update | Drafts shared |
 | Nov 29 – Dec 1 | Shoot and edit demo video, assemble and submit report and slides | Both zips submitted |
 | Ongoing | Meeting records and chat captures | `docs/meetings/` |
 

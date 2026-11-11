@@ -18,6 +18,8 @@ Release/
 result*.png
 out*.png
 eval/*.csv
+results*.csv
+debug_*.png
 
 # Photos (share through the team drive; only small samples go in git)
 data/user/*

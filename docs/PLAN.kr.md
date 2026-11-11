@@ -76,7 +76,7 @@ Team 22 · 영상처리 Team Project 02 (Global / Startup 팀)
 | `LatteArt.exe <기준.jpg> <내것.jpg> tulip:3 [result.png]` | 채점 (최종 프로그램) |
 | `LatteArt.exe --canon <사진> <cx> <cy> <r> <out.png>` | **수동 정규화** (구현 완료). 컵 중심과 반지름을 그림판에서 읽어 넣으면 512 규격 이미지 생성 |
 | `LatteArt.exe --debug <단계> ...` | **단계별 디버그 모드.** 한 단계만 실행하고 중간 결과를 `debug_<단계>_*.png`로 저장. 단계: `preprocess`(Junkyu), `normalize`·`layers`(Jaeku), `segment`·`quality`(Ranju), `viz`(Cecelia). 각 단계 파일 `src/debug/<단계>.cpp`는 그 단계 담당자만 수정. 보고서·데모에서 중간 결과를 보여줄 때도 사용 |
-| `LatteArt.exe --batch ...` | 데이터셋 일괄 채점 → CSV (Junkyu 구현) |
+| `LatteArt.exe --batch <labels.csv> <사진 폴더> <out.csv>` | 데이터셋 일괄 채점 → 결과 CSV와 층 수 정확도 출력 (Cecelia 구현). 기준 사진은 `data/reference/<패턴><층 수>.jpg` (예: `tulip3.jpg`) |
 
 ### 정규화 규칙 (모든 모듈 공통 약속)
 - 정규화된 컵 이미지는 **512 × 512**
@@ -112,11 +112,12 @@ Team 22 · 영상처리 Team Project 02 (Global / Startup 팀)
 |---|---|---|
 | **Jaeku Kang** | 정규화 · 층 수 · 점수 · 전체 연결 | `basic/edge`, `basic/geometry`, `normalize/*`, `structure/layers`, `scoring/*`, `app/pipeline`, `debug/normalize.cpp`, `debug/layers.cpp` |
 | **Ranju Kim** | 패턴 분할 · 품질 지표 5개 · FFT | `basic/threshold`, `basic/morphology`, `basic/fft`, `structure/segment`, `quality/*`, `debug/segment.cpp`, `debug/quality.cpp` |
-| **Junkyu Kim** | 기초 필터 · 색 변환 · 결과 출력 · 배치 검증 | `basic/filter`, `basic/color`, `basic/clahe`, `viz/report`, `app/batch`, `debug/preprocess.cpp` |
-| **Cecelia Hein** | 결과 이미지 그리기 함수 · 자료 수집 · 평가 진행 · 문서 · 발표 | `viz/draw`, `debug/viz.cpp`, `data/`, `docs/` |
+| **Junkyu Kim** | 기초 필터 · 색 변환 · 결과 출력 · 정확도 분석 | `basic/filter`, `basic/color`, `basic/clahe`, `viz/report`, `debug/preprocess.cpp` |
+| **Cecelia Hein** | 결과 이미지 그리기 함수 · 배치 채점 · 자료 수집 · 문서 · 발표 | `viz/draw`, `debug/viz.cpp`, `app/batch`, `data/`, `docs/` |
 
 ### Cecelia Hein 담당 업무
 - **결과 이미지 그리기 함수** (`src/viz/draw.cpp`): 사각형·십자 → 이미지 나란히 붙이기 → 글자(5×7 폰트) → 직선·원 순서로 구현. 함수마다 방법이 주석으로 적혀 있음. `--debug viz`로 결과 확인
+- **배치 채점** (`src/app/batch.cpp`): `labels.csv`를 읽어 사진마다 채점하고 결과 CSV와 층 수 정확도를 출력. 단계별 방법이 주석으로 적혀 있음. 파이프라인이 완성되기 전에는 행마다 TODO 오류가 기록되는 것이 정상
 - **기준 사진 확보**: 하트·튤립 전문가 사진
 - **연습 사진 수집** 약 10장 (하트·튤립 섞어서, 층 수를 맞춘 컵과 틀린 컵을 모두 포함), 각 사진의 **층 수 정답**을 `data/labels.csv`에 기록
 - **`--canon` 이미지 만들기**: 그림판에서 컵 중심(cx, cy)과 반지름(r)을 읽어 실행
@@ -139,7 +140,7 @@ Team 22 · 영상처리 Team Project 02 (Global / Startup 팀)
 | **11/17** | `fft`, `magnitudeSpectrum` | Ranju → Jaeku (층 수 교차검증) |
 | **11/17** | `normalizeCup` | Jaeku → 전원 |
 | **11/22** | `analyzeLayers` | Jaeku → Junkyu (결과 이미지) |
-| **11/24** | 배치 결과 CSV | Junkyu → Jaeku, Ranju (임계값 점검) |
+| **11/24** | 배치 결과 CSV | Cecelia → Jaeku, Ranju (임계값 점검), Junkyu (정확도 표) |
 
 ### Jaeku Kang
 
@@ -168,9 +169,9 @@ Team 22 · 영상처리 Team Project 02 (Global / Startup 팀)
 |---|---|---|
 | **11/12 ~ 11/13** | ★ **`gaussianBlur`, `convolve2D` 최우선** → 바로 main에 머지 | 다른 사람이 사용 가능 |
 | 11/14 ~ 11/17 | `bgrToLab`, `clahe` | `--debug preprocess`로 결과 저장 |
-| 11/18 ~ 11/20 | `printReport` 다듬기, `runBatch` 준비 (labels.csv 읽기) | 콘솔 리포트 완성 |
+| 11/18 ~ 11/20 | `printReport` 다듬기 | 콘솔 리포트 완성 |
 | 11/21 ~ 11/22 | `renderResult` (축, 층 위치, 문제 영역 표시. Cecelia의 그리기 함수 사용) | 결과 이미지 저장 |
-| 11/22 ~ 11/24 | `runBatch` (labels.csv → 결과 CSV) | 전체 사진 일괄 채점 |
+| 11/23 ~ 11/24 | 결과 이미지 다듬기, 버그 수정 | 데모에 쓸 결과 이미지 완성 |
 | 11/25 ~ 11/26 | 층 수 정확도 표 (검출 층 수 vs 정답), 실패 사례 정리 | 보고서용 수치 |
 
 ### Cecelia Hein
@@ -181,7 +182,8 @@ Team 22 · 영상처리 Team Project 02 (Global / Startup 팀)
 | 11/12 ~ 11/14 | 기준 사진(하트·튤립) 확보, **연습 사진 약 10장 수집**, 층 수 정답 기록, `--canon` 이미지 | **11/14 전달** |
 | 11/15 ~ 11/17 | `sideBySide`, `drawText` (5×7 폰트 표 입력) | 두 컵이 나란히, 점수 글자 표시 |
 | 11/18 ~ 11/20 | `drawLine`, `drawCircle` | **11/20 전달** |
-| 11/23 ~ 11/28 | 보고서 초안(①③④⑤⑥), 발표 자료 초안, 시장 조사 업데이트 | 초안 공유 |
+| 11/21 ~ 11/24 | `runBatch`: labels.csv 읽기 → 사진별 채점 → 결과 CSV 쓰기 → 정확도 요약 출력 | **11/24 전달** |
+| 11/25 ~ 11/28 | 보고서 초안(①③④⑤⑥), 발표 자료 초안, 시장 조사 업데이트 | 초안 공유 |
 | 11/29 ~ 12/1 | 데모 영상 촬영·편집, 보고서·PPT 취합 및 제출 | 두 zip 제출 |
 | 상시 | 회의 기록·단톡 캡처 정리 | `docs/meetings/` |
 

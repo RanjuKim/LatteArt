@@ -4,7 +4,7 @@
 // Usage:
 //   LatteArt.exe <reference.jpg> <user.jpg> <pattern:layers> [result.png]
 //   LatteArt.exe --canon <photo.jpg> <cx> <cy> <r> <out.png>
-//   LatteArt.exe --batch <args...>
+//   LatteArt.exe --batch <labels.csv> <photo_dir> <out.csv>
 //   LatteArt.exe --debug <stage> [args...]   (see src/debug/debug.h)
 #include <cstdio>
 #include <exception>
@@ -36,7 +36,7 @@ void usage() {
         "Usage:\n"
         "  LatteArt.exe <reference.jpg> <user.jpg> <pattern:layers> [result.png]\n"
         "  LatteArt.exe --canon <photo.jpg> <cx> <cy> <r> <out.png>\n"
-        "  LatteArt.exe --batch <args...>\n"
+        "  LatteArt.exe --batch <labels.csv> <photo_dir> <out.csv>\n"
         "  LatteArt.exe --debug <preprocess|normalize|segment|layers|quality|viz> [args...]\n");
 }
 
