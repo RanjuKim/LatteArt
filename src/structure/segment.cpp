@@ -1,5 +1,6 @@
+// Owner: Ranju Kim
 #include "core/todo.h"
-#include "structure/structure.h"
+#include "structure/segment.h"
 
 namespace la::structure {
 

@@ -1,3 +1,4 @@
+// Owner: Ranju Kim  (1D fft also used by Jaeku for the layer cross-check; deliver by Nov 17)
 #pragma once
 #include <complex>
 #include <opencv2/core.hpp>

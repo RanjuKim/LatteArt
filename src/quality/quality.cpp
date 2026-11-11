@@ -1,3 +1,4 @@
+// Owner: Ranju Kim
 #include "quality/quality.h"
 
 #include <cmath>

@@ -1,3 +1,4 @@
+// Owner: Junkyu Kim
 #include "basic/color.h"
 
 #include <algorithm>

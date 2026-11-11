@@ -1,3 +1,4 @@
+// Owner: Jaeku Kang
 #pragma once
 #include <array>
 #include <opencv2/core.hpp>

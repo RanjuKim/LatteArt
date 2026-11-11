@@ -1,5 +1,5 @@
 // Owner: Jaeku Kang
-// Pattern segmentation and layer analysis (core of the project).
+// Layer analysis along the pattern axis (core of the project).
 #pragma once
 #include "core/types.h"
 
@@ -10,9 +10,6 @@ struct LayerParams {
     float minProminence = 0.08f;  // in gray units (0..1), tune on data
     float minArcRatio = 0.3f;     // arc must extend to both sides of axis
 };
-
-// Otsu inside the cup + morphology + largest component.
-PatternMask segmentPattern(const NormalizedCup& cup);
 
 // Multi-column brightness profile along the vertical axis.
 std::vector<float> axisProfile(const NormalizedCup& cup, const PatternMask& pm, int halfWidth);

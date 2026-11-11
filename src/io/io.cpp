@@ -1,3 +1,4 @@
+// Owner: SHARED - change only with team agreement (PR approved by all)
 #include "io/io.h"
 
 #include <opencv2/highgui.hpp>

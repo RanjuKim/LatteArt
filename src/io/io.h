@@ -1,3 +1,4 @@
+// Owner: SHARED - change only with team agreement (PR approved by all)
 // The ONLY place allowed to call OpenCV I/O functions.
 #pragma once
 

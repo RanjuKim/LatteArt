@@ -32,23 +32,24 @@ structure first (layer count), then quality (contrast, shape, texture, position,
 ## Run
 ```
 bin\Release\LatteArt.exe data\reference\tulip3.jpg data\user\tulip3_junkyu_01.jpg tulip:3 result.png
+bin\Release\LatteArt.exe --canon photo.jpg <cx> <cy> <r> canon.png     # manual normalization to 512x512
+bin\Release\LatteArt.exe --selftest <jaeku|ranju|junkyu> [args...]      # personal sandbox
+bin\Release\LatteArt.exe --batch [args...]                               # score the whole dataset
 ```
 Unimplemented steps throw `TODO: ...` and the program prints which stage stopped.
 
-## Layout and owners
+## Owners
 
-| Folder | Contents | Owner |
-|---|---|---|
-| `src/core` | Shared structs (`types.h`) — change only after team agreement | all |
-| `src/io` | The **only** place that calls OpenCV (`imread/imwrite/imshow/waitKey`) | — |
-| `src/basic` | Own implementations: color, Gaussian, CLAHE, Sobel/Canny, Otsu, morphology, FFT, warp | split among all |
-| `src/normalize` | Cup rim, ellipse fit, perspective/scale/rotation normalization, PCA axis | Jaeku |
-| `src/structure` | Pattern segmentation, axis profile, layer counting, FFT cross-check | Jaeku |
-| `src/scoring` | Banded score `S = L + (H − L)(0.3U + 0.7Q)` | Jaeku |
-| `src/quality` | Contrast, shape, texture, position, size | Ranju |
-| `src/viz` | Console report, result image | Cecelia |
-| `data/` | Reference photos, labels (`labels.csv`); practice photos stay on the team drive | Junkyu |
-| `docs/meetings` | KakaoTalk captures / meeting photos for the final report | all |
+Full plan, file ownership rules and per-person schedule: **[docs/PLAN.en.md](docs/PLAN.en.md)** (한국어: [docs/PLAN.md](docs/PLAN.md)).
+The first line of every source file says `// Owner: <name>` — edit only your own files.
+
+| Owner | Files |
+|---|---|
+| Jaeku Kang | `basic/edge`, `basic/geometry`, `normalize/*`, `structure/layers`, `scoring/*`, `app/pipeline`, `selftest/jaeku.cpp` |
+| Ranju Kim | `basic/threshold`, `basic/morphology`, `basic/fft`, `structure/segment`, `quality/*`, `selftest/ranju.cpp` |
+| Junkyu Kim | `basic/filter`, `basic/color`, `basic/clahe`, `viz/*`, `app/batch`, `selftest/junkyu.cpp` |
+| Cecelia Hein | No coding: `data/` (photos, labels, ratings), `docs/` (meetings, report, slides, demo video) |
+| SHARED (PR approved by all) | `core/*`, `io/*`, `app/main.cpp`, `selftest/selftest.h`, `LatteArt.vcxproj(.filters)`, `opencv.props` |
 
 ### Normalized frame (contract)
 Every `NormalizedCup` is 512×512, cup rim radius 240 px centered, pattern main axis pointing **up**.

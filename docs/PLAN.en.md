@@ -1,7 +1,7 @@
 # LatteArt Development Plan
 
 Team 22 · Image Processing Team Project 02 (Global / Startup team)
-Written 2026-11-11 · Original proposal: [Team22_LatteArt_Plan.docx](Team22_LatteArt_Plan.docx) · 한국어: [PLAN.md](PLAN.md)
+Written 2026-11-11 (roles and schedule revised) · Original proposal: [Team22_LatteArt_Plan.docx](Team22_LatteArt_Plan.docx) · 한국어: [PLAN.md](PLAN.md)
 
 ---
 
@@ -69,15 +69,20 @@ Two photos (reference, user) + target pattern (e.g. tulip:3)
    └─ viz         console report + save/show result image
 ```
 
+### Run modes
+
+| Command | Purpose |
+|---|---|
+| `LatteArt.exe <ref.jpg> <mine.jpg> tulip:3 [result.png]` | Scoring (the final program) |
+| `LatteArt.exe --canon <photo> <cx> <cy> <r> <out.png>` | **Manual normalization** (done). Read the cup center and radius in Paint and get a 512 canonical image |
+| `LatteArt.exe --selftest <jaeku\|ranju\|junkyu> ...` | Personal sandbox. Each person edits only their own `src/selftest/<name>.cpp` |
+| `LatteArt.exe --batch ...` | Score the whole dataset → CSV (Junkyu) |
+
 ### Normalization contract (shared by all modules)
 - A normalized cup image is **512 × 512**
 - The cup rim has **radius 240 px**, centered in the image
 - The pattern's main axis points **up (↑)**
-- Until the normalize module is ready, develop with hand-cropped images that follow these rules
-
-### Data passed between modules (`src/core/types.h`)
-`NormalizedCup`, `PatternMask`, `LayerResult`, `QualityResult`, `ScoreResult`
-→ **Do not change them without team agreement**
+- Until automatic normalization is ready, develop with images made by **`--canon`**
 
 ### Score bands (from the proposal, already implemented)
 
@@ -91,44 +96,110 @@ Quality weights (draft, to be tuned with data): contrast 30% · shape 25% · tex
 
 ---
 
-## 4. Roles
+## 4. Roles (designed to avoid merge conflicts)
 
-| Owner | Scope | Folder |
+### Conflict rules
+1. **File-level ownership.** The first line of every source file says `// Owner: <name>`. **Edit only your own files.**
+2. **SHARED files need a separate PR approved by everyone:** `core/types.h`, `core/todo.h`, `io/`, `app/main.cpp`, `selftest/selftest.h`, `LatteArt.vcxproj(.filters)`, `opencv.props`
+3. **Experiment in your own selftest file.** Run it with `--selftest <name>`; never edit `main.cpp` for testing.
+4. **Need someone else's function? Ask the owner** (KakaoTalk or a GitHub Issue) instead of editing it. While you wait, write a temporary version inside your own selftest file.
+5. **Every file we need already exists and is registered in the project.** Avoid adding files; if you must, open a small PR that only touches the vcxproj.
+6. Structs needed only by your module go in **your own header**, not `types.h`.
+
+### File ownership
+
+| Owner | Role | Files |
 |---|---|---|
-| **Jaeku Kang** | Normalization, structure analysis (layer count), scoring | `src/normalize`, `src/structure`, `src/scoring` |
-| **Ranju Kim** | The five quality metrics | `src/quality` |
-| **Junkyu Kim** | Photo collection, ground-truth labels, blind rating, correlation analysis | `data/` |
-| **Cecelia Hein** | Result display, demo video, market research, presentation | `src/viz`, presentation |
-| **Everyone** | Split the basic operations in `src/basic` | `src/basic` |
+| **Jaeku Kang** | Normalization · layer count · scoring · wiring the pipeline | `basic/edge`, `basic/geometry`, `normalize/*`, `structure/layers`, `scoring/*`, `app/pipeline`, `selftest/jaeku.cpp` |
+| **Ranju Kim** | Pattern segmentation · five quality metrics · FFT | `basic/threshold`, `basic/morphology`, `basic/fft`, `structure/segment`, `quality/*`, `selftest/ranju.cpp` |
+| **Junkyu Kim** | Basic filters · color conversion · result output · batch validation | `basic/filter`, `basic/color`, `basic/clahe`, `viz/*`, `app/batch`, `selftest/junkyu.cpp` |
+| **Cecelia Hein** | **No coding.** Data collection · rating sessions · documents · presentation | `data/`, `docs/` |
 
-### Splitting `basic/` operations (proposal)
-Jaeku has the heaviest load, so the basic operations are shared.
-
-| Operation | Owner (proposed) | Mainly used by |
-|---|---|---|
-| Sobel / Canny, geometric warp | Jaeku Kang | Normalization |
-| Otsu, morphology, Gaussian blur, FFT | Ranju Kim | Segmentation, quality, layer cross-check |
-| Lab color conversion, CLAHE | Junkyu Kim | Preprocessing |
-| (Pixel drawing helpers for the result image) | Cecelia Hein | Result image |
+### Cecelia Hein's tasks (non-development)
+- Write the **shooting guide** (English/Korean): shoot straight down, no shadows, whole cup visible
+- **Get the reference photos**: expert heart and tulip (barista contacts, cafés)
+- **Collect 30–40 practice photos** and record the **true layer count** of each in `data/labels.csv`
+- **Make `--canon` images**: read the cup center (cx, cy) and radius (r) in Paint and run the exe (uses a built exe, no coding)
+- **Run the blind rating**: recruit 3 raters, prepare the rating sheet, collect scores
+- **Meeting records**: KakaoTalk captures and meeting photos in `docs/meetings/` (report section 4)
+- Update **market and competitor research**, business plan
+- **Assemble the report** (sections 1, 3, 4, 5, 6), **slides**, shoot and edit the **demo video**, English proofreading, run the rehearsal
 
 ---
 
 ## 5. Schedule
 
-| Dates | Common / Jaeku Kang | Ranju Kim | Junkyu Kim | Cecelia Hein |
-|---|---|---|---|---|
-| **Nov 11 – 13** | ✅ Repo skeleton, VS solution, shared headers<br>Agree on `types.h` | Basic ops (Otsu, morphology, Gaussian) | Write shooting guide, start collecting photos | Result screen layout draft |
-| **Nov 14 – 17** | Cup detection → ellipse fit → homography → PCA rotation | **Size, position, contrast** on hand-normalized images | Ground-truth labels (`data/labels.csv`) | Result image overlay |
-| **Nov 18 – 22** | Pattern segmentation, multi-column profile, layer counting, FFT cross-check | **Shape (mirror IoU, Hu), texture (GLCM, LoG)** | Batch run, first layer-count accuracy measurement | Console report, feedback messages |
-| **Nov 23 – 26** | Full integration, bug fixes | Tune weights and thresholds | Blind rating, correlation analysis | Save result image, prepare demo |
-| **Nov 27 – 28** | **Code freeze**, library check, clean build on another PC, submit Src zip | | | |
-| **Nov 29 – Dec 1** | Error analysis, report, slides, demo video → submit PPT / Final zips | | | |
-| **Dec 2** | **Full-team rehearsal** | | | |
-| **Dec 3** | Final presentation | | | |
+### Hand-off dates (if one slips, someone else is blocked)
+
+| Date | Deliverable | From → To |
+|---|---|---|
+| **Nov 13** | `gaussianBlur`, `convolve2D` | Junkyu → Jaeku (Canny), Ranju (segmentation, LoG) |
+| **Nov 14** | `--canon` images of 2 reference + 10 practice photos | Cecelia → Ranju, Junkyu |
+| **Nov 15** | `segmentPattern` | Ranju → Jaeku (pattern-axis PCA) |
+| **Nov 17** | `fft`, `magnitudeSpectrum` | Ranju → Jaeku (layer cross-check) |
+| **Nov 17** | `normalizeCup` | Jaeku → everyone |
+| **Nov 22** | `analyzeLayers` | Jaeku → Junkyu (result image) |
+| **Nov 22** | 30–40 photos + true layer counts | Cecelia → Junkyu (batch) |
+| **Nov 24** | Batch result CSV | Junkyu → Jaeku, Ranju (tuning) |
+| **Nov 25** | Human rating scores | Cecelia → Junkyu (correlation) |
+
+### Jaeku Kang
+
+| Dates | Tasks | Done when |
+|---|---|---|
+| Nov 12 – 14 | `sobel`, `canny`, `warpPerspective` (temporary blur in selftest until Gaussian arrives) | Edge map of a real photo saved |
+| Nov 15 – 17 | `findRimPoints`, `fitEllipse`, `normalizeCup` (ellipse → circle, scale), `patternAxisAngleDeg` | 10 photos normalized to 512 automatically |
+| Nov 18 – 21 | `axisProfile`, `findPeaks`, spacing/thickness CV, FFT cross-check, U | Target layer count detected on reference photos |
+| Nov 22 | Wire `pipeline` end to end | Two photos → final score printed |
+| Nov 23 – 26 | Tune prominence and other thresholds from batch results, fix bugs | Layer-count accuracy measured |
+
+### Ranju Kim
+
+| Dates | Tasks | Done when |
+|---|---|---|
+| Nov 12 – 14 | `otsuThreshold`, `binarize`, `erode`/`dilate`, `largestComponent` | Binarized result saved via selftest |
+| Nov 15 | `segmentPattern` → hand to Jaeku | Pattern mask saved from a `--canon` image |
+| Nov 15 – 17 | `fft`, `magnitudeSpectrum` (→ Jaeku), `evalSize`, `evalPosition` | Size and position scores printed |
+| Nov 18 – 20 | `fft2Magnitude`, `evalContrast` (Michelson, edge width, high-frequency ratio) | Contrast score printed |
+| Nov 20 – 22 | `evalShape` (mirror IoU, Hu), `evalTexture` (GLCM, LoG, highlights) | All 5 item scores + feedback sentences |
+| Nov 23 – 26 | Tune σ and weights, polish feedback sentences | Scores move in the same direction as human ratings |
+
+### Junkyu Kim
+
+| Dates | Tasks | Done when |
+|---|---|---|
+| **Nov 12 – 13** | ★ **`gaussianBlur`, `convolve2D` first** → merge to main right away | Others can use them |
+| Nov 14 – 17 | `bgrToLab`, `clahe`, `drawLine`/`drawCircle`/`drawCross`/`drawRect` | Shapes drawn on a selftest image |
+| Nov 18 – 20 | `drawText` (5×7 bitmap font), `sideBySide`, polish `printReport` | Score text shown on the image |
+| Nov 21 – 22 | `renderResult` (axis, layer positions, problem areas) | Result image saved |
+| Nov 22 – 24 | `runBatch` (labels.csv → result CSV) | Whole dataset scored in one run |
+| Nov 25 – 26 | Correlation with human ratings (Spearman, Excel is fine), layer-count accuracy table | Numbers for the report |
+
+### Cecelia Hein
+
+| Dates | Tasks | Done when |
+|---|---|---|
+| Nov 12 – 13 | Shooting guide, rating sheet template | Shared in the group chat |
+| Nov 12 – 14 | Reference photos (heart, tulip), 10 practice photos + `--canon` images | **Handed over Nov 14** |
+| Nov 15 – 22 | Collect 30–40 photos, record true layer counts | **Handed over Nov 22** |
+| Nov 20 – 25 | Blind rating (3 raters) | **Handed over Nov 25** |
+| Nov 23 – 28 | Report draft (sections 1, 3, 4, 5, 6), slide draft, market research update | Drafts shared |
+| Nov 29 – Dec 1 | Shoot and edit demo video, assemble and submit report and slides | Both zips submitted |
+| Ongoing | Meeting records and chat captures | `docs/meetings/` |
+
+### Everyone
+
+| Date | Task |
+|---|---|
+| **Nov 13** | Final agreement on the `types.h` structs and normalization rules |
+| **Nov 27 – 28** | **Code freeze**, library check, clean build on another PC, submit Src zip (led by Jaeku) |
+| Nov 29 – Dec 1 | The three developers write report section 2 (design) and the error analysis → hand to Cecelia |
+| **Dec 2** | Full-team rehearsal |
+| **Dec 3** | Final presentation |
 
 ### Milestones
-- **Nov 17**: normalized image set ready
-- **Nov 22**: two photos + pattern in → final score out (quality can still be rough)
+- **Nov 17**: automatic normalization done
+- **Nov 22**: two photos + pattern in → final score and result image out
 - **Nov 26**: tuning done, failure cases collected
 - **Nov 27**: first version of the Src zip prepared in advance
 
@@ -156,9 +227,11 @@ Jaeku has the heaviest load, so the basic operations are shared.
 | Risk | Mitigation |
 |---|---|
 | **Layer-count accuracy** (core of the project) | Control input quality with a shooting guide (shoot straight down, no shadows, whole cup visible). This helps more than algorithm tweaks |
-| Too much work on Jaeku | Basic operations split across all four; FFT owned by Ranju |
+| Gaussian (Nov 13) is late, blocking Canny and segmentation | Junkyu's top priority. If late, use a temporary 3×3 box filter inside your selftest |
+| Automatic normalization (Nov 17) is late | Quality and result-image work continue on `--canon` images |
 | Ellipse fitting / homography are hard to implement | If behind schedule, reduce scope to "ask for a retake when the photo is heavily tilted" (already stated in the proposal) |
-| Integration conflicts | Agree on shared headers first, keep `main` always building, feature branches + PRs |
+| Photos or ratings arrive late | Check Cecelia's hand-off dates (Nov 14, 22, 25) daily in the group chat |
+| Integration conflicts | File-level ownership, SHARED files need everyone's approval, keep `main` always building |
 | Build fails on the grader's PC | On Nov 27, unzip on another PC, clean build and run |
 | Breaking the library rule | Check script before every merge; record any exception and our contribution in the report |
 
@@ -167,7 +240,8 @@ Jaeku has the heaviest load, so the basic operations are shared.
 ## 8. Git workflow
 
 - Keep `main` **always building**
-- Work on `feature/<name>-<topic>` branches (e.g. `feature/ranju-contrast`) and merge through PRs
+- Work on `feature/<name>-<topic>` branches (e.g. `feature/ranju-otsu`) and merge through PRs
+- Before a PR, make sure the **Release x64 build and the check script** pass
 - Commit message: `[module] what changed` (e.g. `[quality] add Michelson contrast`)
 - Original photos are shared on the team drive, not in git. Only reference photos (`data/reference/`) live in the repo
 

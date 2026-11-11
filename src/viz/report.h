@@ -1,4 +1,4 @@
-// Owner: Cecelia Hein
+// Owner: Junkyu Kim
 // Console report and the side-by-side result image.
 #pragma once
 #include "core/types.h"

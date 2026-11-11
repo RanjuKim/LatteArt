@@ -1,3 +1,4 @@
+// Owner: Jaeku Kang
 #include "scoring/scoring.h"
 
 #include <algorithm>

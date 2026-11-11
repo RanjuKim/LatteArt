@@ -1,7 +1,7 @@
 # LatteArt 개발 계획
 
 Team 22 · 영상처리 Team Project 02 (Global / Startup 팀)
-작성: 2026-11-11 · 원래 기획서는 [Team22_LatteArt_Plan.docx](Team22_LatteArt_Plan.docx) 참고 · English: [PLAN.en.md](PLAN.en.md)
+작성: 2026-11-11 (역할·일정 개편) · 원래 기획서는 [Team22_LatteArt_Plan.docx](Team22_LatteArt_Plan.docx) 참고 · English: [PLAN.en.md](PLAN.en.md)
 
 ---
 
@@ -69,15 +69,20 @@ Team 22 · 영상처리 Team Project 02 (Global / Startup 팀)
    └─ viz         콘솔 리포트 + 결과 이미지 저장/표시
 ```
 
+### 실행 모드
+
+| 명령 | 용도 |
+|---|---|
+| `LatteArt.exe <기준.jpg> <내것.jpg> tulip:3 [result.png]` | 채점 (최종 프로그램) |
+| `LatteArt.exe --canon <사진> <cx> <cy> <r> <out.png>` | **수동 정규화** (구현 완료). 컵 중심과 반지름을 그림판에서 읽어 넣으면 512 규격 이미지 생성 |
+| `LatteArt.exe --selftest <jaeku\|ranju\|junkyu> ...` | 개인 실험용. 각자 자기 `src/selftest/<이름>.cpp`만 수정 |
+| `LatteArt.exe --batch ...` | 데이터셋 일괄 채점 → CSV (Junkyu 구현) |
+
 ### 정규화 규칙 (모든 모듈 공통 약속)
 - 정규화된 컵 이미지는 **512 × 512**
 - 컵 테두리는 **반지름 240px**, 이미지 정중앙
 - 패턴 주축은 **위쪽(↑)** 방향
-- 정규화 모듈이 완성되기 전에는, 이 규칙에 맞춰 손으로 자른 이미지로 각자 개발
-
-### 모듈 간 데이터 (`src/core/types.h`)
-`NormalizedCup`, `PatternMask`, `LayerResult`, `QualityResult`, `ScoreResult`
-→ **팀 합의 없이 수정하지 않기**
+- 자동 정규화가 완성되기 전에는 **`--canon`으로 만든 이미지**로 각자 개발
 
 ### 점수 구간 (기획서 기준, 구현 완료)
 
@@ -91,44 +96,110 @@ Team 22 · 영상처리 Team Project 02 (Global / Startup 팀)
 
 ---
 
-## 4. 역할 분담
+## 4. 역할 분담 (충돌 최소화)
 
-| 담당 | 범위 | 폴더 |
+### 충돌 방지 규칙
+1. **파일 단위 소유.** 모든 소스 파일 첫 줄에 `// Owner: 이름`이 적혀 있습니다. **자기 파일만 수정**합니다.
+2. **공용 파일(SHARED)은 따로 PR + 전원 승인.** `core/types.h`, `core/todo.h`, `io/`, `app/main.cpp`, `selftest/selftest.h`, `LatteArt.vcxproj(.filters)`, `opencv.props`
+3. **실험은 개인 selftest 파일에서.** `--selftest <이름>`으로 실행하고 `main.cpp`는 건드리지 않습니다.
+4. **남의 함수가 필요하면 직접 고치지 말고 담당자에게 요청**합니다(단톡 또는 GitHub Issue). 기다리는 동안에는 자기 selftest 파일 안에 임시 구현을 만들어 씁니다.
+5. **필요한 파일은 이미 전부 만들어 프로젝트에 등록**해 두었습니다. 새 파일 추가는 가급적 피하고, 꼭 필요하면 vcxproj만 고치는 작은 PR을 따로 올립니다.
+6. 내 모듈에만 필요한 구조체는 `types.h`에 넣지 말고 **내 헤더에** 정의합니다.
+
+### 담당 파일
+
+| 담당 | 역할 | 소유 파일 |
 |---|---|---|
-| **Jaeku Kang** | 정규화, 구조 분석(층 수), 점수 계산 | `src/normalize`, `src/structure`, `src/scoring` |
-| **Ranju Kim** | 품질 지표 5개 | `src/quality` |
-| **Junkyu Kim** | 사진 수집, 정답 라벨링, 블라인드 평가, 상관분석 | `data/` |
-| **Cecelia Hein** | 결과 출력, 데모 영상, 시장 조사, 발표 자료 | `src/viz`, 발표 |
-| **전원** | `src/basic` 기초 연산을 나눠서 구현 | `src/basic` |
+| **Jaeku Kang** | 정규화 · 층 수 · 점수 · 전체 연결 | `basic/edge`, `basic/geometry`, `normalize/*`, `structure/layers`, `scoring/*`, `app/pipeline`, `selftest/jaeku.cpp` |
+| **Ranju Kim** | 패턴 분할 · 품질 지표 5개 · FFT | `basic/threshold`, `basic/morphology`, `basic/fft`, `structure/segment`, `quality/*`, `selftest/ranju.cpp` |
+| **Junkyu Kim** | 기초 필터 · 색 변환 · 결과 출력 · 배치 검증 | `basic/filter`, `basic/color`, `basic/clahe`, `viz/*`, `app/batch`, `selftest/junkyu.cpp` |
+| **Cecelia Hein** | **개발 제외.** 자료 수집 · 평가 진행 · 문서 · 발표 | `data/`, `docs/` |
 
-### `basic/` 기초 연산 분배 (제안)
-Jaeku 쪽에 일이 몰려 있으므로 기초 연산은 나눠서 구현합니다.
-
-| 연산 | 담당 (제안) | 주로 쓰는 곳 |
-|---|---|---|
-| Sobel / Canny, 기하 변환(warp) | Jaeku Kang | 정규화 |
-| Otsu, 모폴로지, Gaussian blur, FFT | Ranju Kim | 분할, 품질, 층 수 교차검증 |
-| Lab 색 변환, CLAHE | Junkyu Kim | 전처리 |
-| (결과 그리기용 픽셀 함수) | Cecelia Hein | 결과 이미지 |
+### Cecelia Hein 담당 업무 (비개발)
+- **촬영 가이드** 작성(영문/국문): 위에서 수직 촬영, 그림자 없이, 컵 전체가 보이게
+- **기준 사진 확보**: 하트·튤립 전문가 사진 (바리스타 지인, 카페 섭외)
+- **연습 사진 수집** 30~40장, 각 사진의 **층 수 정답**을 `data/labels.csv`에 기록
+- **`--canon` 이미지 만들기**: 그림판에서 컵 중심(cx, cy)과 반지름(r)을 읽어 실행 (빌드된 exe를 받아서 사용, 코딩 불필요)
+- **블라인드 평가 진행**: 평가자 3명 섭외, 평가표 작성, 점수 수집
+- **회의 기록**: 단톡 캡처와 회의 사진을 `docs/meetings/`에 정리 (보고서 ④)
+- **시장·경쟁 앱 조사** 업데이트, 사업 계획 정리
+- **보고서 취합**(①개요 ③타임라인 ④토론 ⑤소감 ⑥사업), **발표 자료**, **데모 영상** 촬영·편집, 영어 교정, 리허설 진행
 
 ---
 
 ## 5. 일정
 
-| 기간 | 공통 / Jaeku Kang | Ranju Kim | Junkyu Kim | Cecelia Hein |
-|---|---|---|---|---|
-| **11/11 ~ 11/13** | ✅ 레포 뼈대, VS 솔루션, 공통 헤더<br>`types.h` 팀 합의 | 기초 연산 (Otsu, 모폴로지, Gaussian) | 촬영 가이드 작성, 사진 수집 시작 | 결과 화면 구성안 |
-| **11/14 ~ 11/17** | 컵 검출 → 타원 피팅 → 호모그래피 → PCA 회전 | 수동 정규화 이미지로 **크기, 위치, 대비** 구현 | 정답 라벨 작성 (`data/labels.csv`) | 결과 이미지 오버레이 |
-| **11/18 ~ 11/22** | 패턴 분할, 다중 열 프로파일, 층 수 판정, FFT 교차검증 | **모양(mirror IoU, Hu), 질감(GLCM, LoG)** 구현 | 배치 실행으로 층 수 정확도 1차 측정 | 콘솔 리포트, 피드백 문구 |
-| **11/23 ~ 11/26** | 전체 통합, 버그 수정 | 가중치 · 임계값 튜닝 | 블라인드 평가, 상관분석 | 결과 이미지 저장, 데모 준비 |
-| **11/27 ~ 11/28** | **코드 동결**, 라이브러리 점검, 다른 PC에서 클린 빌드, Src zip 제출 | | | |
-| **11/29 ~ 12/1** | 오류 분석, 보고서, 발표 자료, 데모 영상 → PPT / Final zip 제출 | | | |
-| **12/2** | **전원 발표 리허설** | | | |
-| **12/3** | 최종 발표 | | | |
+### 주고받는 날짜 (이 날짜가 밀리면 다른 사람이 막힘)
+
+| 날짜 | 전달물 | 보내는 사람 → 받는 사람 |
+|---|---|---|
+| **11/13** | `gaussianBlur`, `convolve2D` | Junkyu → Jaeku (Canny), Ranju (분할, LoG) |
+| **11/14** | 기준 사진 2장 + 연습 사진 10장의 `--canon` 이미지 | Cecelia → Ranju, Junkyu |
+| **11/15** | `segmentPattern` | Ranju → Jaeku (패턴 축 PCA) |
+| **11/17** | `fft`, `magnitudeSpectrum` | Ranju → Jaeku (층 수 교차검증) |
+| **11/17** | `normalizeCup` | Jaeku → 전원 |
+| **11/22** | `analyzeLayers` | Jaeku → Junkyu (결과 이미지) |
+| **11/22** | 사진 30~40장 + 층 수 정답 | Cecelia → Junkyu (배치) |
+| **11/24** | 배치 결과 CSV | Junkyu → Jaeku, Ranju (튜닝) |
+| **11/25** | 사람 평가 점수 | Cecelia → Junkyu (상관분석) |
+
+### Jaeku Kang
+
+| 기간 | 할 일 | 완료 기준 |
+|---|---|---|
+| 11/12 ~ 11/14 | `sobel`, `canny`, `warpPerspective` (Gaussian이 오기 전에는 selftest 안에 임시 블러) | 실제 사진의 엣지 맵 저장 |
+| 11/15 ~ 11/17 | `findRimPoints`, `fitEllipse`, `normalizeCup`(타원→원, 크기 맞춤), `patternAxisAngleDeg` | 사진 10장이 512 규격으로 자동 정규화 |
+| 11/18 ~ 11/21 | `axisProfile`, `findPeaks`, 간격·두께 CV, FFT 교차검증, U | 기준 사진에서 목표 층 수 검출 |
+| 11/22 | `pipeline` 끝까지 연결 | 사진 2장 → 최종 점수 출력 |
+| 11/23 ~ 11/26 | 배치 결과로 prominence 등 임계값 튜닝, 버그 수정 | 층 수 정확도 수치 확보 |
+
+### Ranju Kim
+
+| 기간 | 할 일 | 완료 기준 |
+|---|---|---|
+| 11/12 ~ 11/14 | `otsuThreshold`, `binarize`, `erode`/`dilate`, `largestComponent` | selftest로 이진화 결과 저장 |
+| 11/15 | `segmentPattern` → Jaeku에게 전달 | `--canon` 이미지에서 패턴 마스크 저장 |
+| 11/15 ~ 11/17 | `fft`, `magnitudeSpectrum`(→ Jaeku), `evalSize`, `evalPosition` | 크기·위치 점수 출력 |
+| 11/18 ~ 11/20 | `fft2Magnitude`, `evalContrast` (Michelson, 경계 폭, 고주파 비율) | 대비 점수 출력 |
+| 11/20 ~ 11/22 | `evalShape` (mirror IoU, Hu), `evalTexture` (GLCM, LoG, 하이라이트) | 5개 항목 점수 + 피드백 문장 |
+| 11/23 ~ 11/26 | σ · 가중치 튜닝, 피드백 문장 다듬기 | 사람 평가와 방향 일치 |
+
+### Junkyu Kim
+
+| 기간 | 할 일 | 완료 기준 |
+|---|---|---|
+| **11/12 ~ 11/13** | ★ **`gaussianBlur`, `convolve2D` 최우선** → 바로 main에 머지 | 다른 사람이 사용 가능 |
+| 11/14 ~ 11/17 | `bgrToLab`, `clahe`, `drawLine`/`drawCircle`/`drawCross`/`drawRect` | selftest 이미지에 도형 표시 |
+| 11/18 ~ 11/20 | `drawText` (5×7 비트맵 폰트), `sideBySide`, `printReport` 다듬기 | 점수 글자가 이미지에 표시 |
+| 11/21 ~ 11/22 | `renderResult` (축, 층 위치, 문제 영역 표시) | 결과 이미지 저장 |
+| 11/22 ~ 11/24 | `runBatch` (labels.csv → 결과 CSV) | 전체 사진 일괄 채점 |
+| 11/25 ~ 11/26 | 사람 평가와 상관분석 (Spearman, 엑셀 가능), 층 수 정확도 표 | 보고서용 수치 |
+
+### Cecelia Hein
+
+| 기간 | 할 일 | 완료 기준 |
+|---|---|---|
+| 11/12 ~ 11/13 | 촬영 가이드, 평가표 양식 | 단톡에 공유 |
+| 11/12 ~ 11/14 | 기준 사진(하트·튤립) 확보, 연습 사진 10장 + `--canon` 이미지 | **11/14 전달** |
+| 11/15 ~ 11/22 | 사진 30~40장 수집, 층 수 정답 기록 | **11/22 전달** |
+| 11/20 ~ 11/25 | 블라인드 평가 (평가자 3명) | **11/25 전달** |
+| 11/23 ~ 11/28 | 보고서 초안(①③④⑤⑥), 발표 자료 초안, 시장 조사 업데이트 | 초안 공유 |
+| 11/29 ~ 12/1 | 데모 영상 촬영·편집, 보고서·PPT 취합 및 제출 | 두 zip 제출 |
+| 상시 | 회의 기록·단톡 캡처 정리 | `docs/meetings/` |
+
+### 전원 공통
+
+| 날짜 | 할 일 |
+|---|---|
+| **11/13** | `types.h` 구조체와 정규화 규칙 최종 합의 |
+| **11/27 ~ 11/28** | **코드 동결**, 라이브러리 점검, 다른 PC에서 클린 빌드, Src zip 제출 (Jaeku 주관) |
+| 11/29 ~ 12/1 | 개발 3명: 보고서 ②설계와 오류 분석 작성 → Cecelia에게 전달 |
+| **12/2** | 전원 발표 리허설 |
+| **12/3** | 최종 발표 |
 
 ### 마일스톤
-- **11/17**: 정규화된 이미지 세트 완성
-- **11/22**: 사진 2장과 패턴을 넣으면 최종 점수가 나오는 상태 (품질이 거칠어도 됨)
+- **11/17**: 자동 정규화 완성
+- **11/22**: 사진 2장과 패턴을 넣으면 최종 점수와 결과 이미지가 나오는 상태
 - **11/26**: 튜닝 완료, 실패 사례 정리
 - **11/27**: Src zip 1차본 미리 만들어 두기
 
@@ -156,9 +227,11 @@ Jaeku 쪽에 일이 몰려 있으므로 기초 연산은 나눠서 구현합니�
 | 리스크 | 대응 |
 |---|---|
 | **층 수 판정 정확도** (프로젝트 핵심) | 촬영 가이드로 입력 품질 통제(위에서 수직 촬영, 그림자 없음, 컵 전체가 보이게). 알고리즘 개선보다 효과가 큼 |
-| Jaeku에게 작업 집중 | 기초 연산을 4명이 분배, FFT는 Ranju 담당 |
+| Gaussian(11/13)이 늦어 Canny·분할이 막힘 | Junkyu 최우선 처리. 늦어지면 각자 selftest 안에 3×3 평균 필터로 임시 대체 |
+| 자동 정규화(11/17)가 늦음 | 품질·결과 화면은 `--canon` 이미지로 계속 진행 가능 |
 | 타원 피팅 · 호모그래피 구현 난이도 | 일정이 밀리면 "심하게 기운 사진은 재촬영 요청"으로 범위 축소 (기획서에 명시됨) |
-| 통합 시 충돌 | 공통 헤더 먼저 합의, `main`은 항상 빌드되는 상태 유지, feature 브랜치 + PR |
+| 사진·평가 데이터가 늦음 | Cecelia 전달 날짜(11/14, 11/22, 11/25)를 단톡에서 매일 확인 |
+| 통합 시 충돌 | 파일 단위 소유, 공용 파일은 전원 승인, `main`은 항상 빌드되는 상태 유지 |
 | 채점 PC에서 빌드 실패 | 11/27에 다른 PC에서 압축 풀고 클린 빌드 · 실행 확인 |
 | 라이브러리 규칙 위반 | 머지 전 점검 스크립트, 예외 사용 시 보고서에 기여점 기록 |
 
@@ -167,7 +240,8 @@ Jaeku 쪽에 일이 몰려 있으므로 기초 연산은 나눠서 구현합니�
 ## 8. Git 작업 방식
 
 - `main`은 **항상 빌드되는 상태**로 유지
-- 작업은 `feature/<이름>-<주제>` 브랜치에서 (예: `feature/ranju-contrast`), PR로 머지
+- 작업은 `feature/<이름>-<주제>` 브랜치에서 (예: `feature/ranju-otsu`), PR로 머지
+- PR 전에 **Release x64 빌드 + 점검 스크립트** 통과 확인
 - 커밋 메시지: `[모듈] 변경 내용` (예: `[quality] add Michelson contrast`)
 - 사진 원본은 git에 올리지 않고 팀 드라이브로 공유. 기준 사진(`data/reference/`)만 레포에 포함
 

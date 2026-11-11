@@ -72,42 +72,57 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="src\core\types.h" />
-    <ClInclude Include="src\core\todo.h" />
-    <ClInclude Include="src\io\io.h" />
+    <ClInclude Include="src\app\batch.h" />
+    <ClInclude Include="src\app\pipeline.h" />
+    <ClInclude Include="src\basic\clahe.h" />
     <ClInclude Include="src\basic\color.h" />
-    <ClInclude Include="src\basic\filter.h" />
     <ClInclude Include="src\basic\edge.h" />
-    <ClInclude Include="src\basic\threshold.h" />
-    <ClInclude Include="src\basic\morphology.h" />
     <ClInclude Include="src\basic\fft.h" />
+    <ClInclude Include="src\basic\filter.h" />
     <ClInclude Include="src\basic\geometry.h" />
+    <ClInclude Include="src\basic\morphology.h" />
+    <ClInclude Include="src\basic\threshold.h" />
+    <ClInclude Include="src\core\todo.h" />
+    <ClInclude Include="src\core\types.h" />
+    <ClInclude Include="src\io\io.h" />
+    <ClInclude Include="src\normalize\manual.h" />
     <ClInclude Include="src\normalize\normalize.h" />
-    <ClInclude Include="src\structure\structure.h" />
     <ClInclude Include="src\quality\quality.h" />
     <ClInclude Include="src\scoring\scoring.h" />
+    <ClInclude Include="src\selftest\selftest.h" />
+    <ClInclude Include="src\structure\layers.h" />
+    <ClInclude Include="src\structure\segment.h" />
+    <ClInclude Include="src\viz\draw.h" />
     <ClInclude Include="src\viz\report.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\io\io.cpp" />
+    <ClCompile Include="src\app\batch.cpp" />
+    <ClCompile Include="src\app\main.cpp" />
+    <ClCompile Include="src\app\pipeline.cpp" />
+    <ClCompile Include="src\basic\clahe.cpp" />
     <ClCompile Include="src\basic\color.cpp" />
-    <ClCompile Include="src\basic\filter.cpp" />
     <ClCompile Include="src\basic\edge.cpp" />
-    <ClCompile Include="src\basic\threshold.cpp" />
-    <ClCompile Include="src\basic\morphology.cpp" />
     <ClCompile Include="src\basic\fft.cpp" />
+    <ClCompile Include="src\basic\filter.cpp" />
     <ClCompile Include="src\basic\geometry.cpp" />
+    <ClCompile Include="src\basic\morphology.cpp" />
+    <ClCompile Include="src\basic\threshold.cpp" />
+    <ClCompile Include="src\io\io.cpp" />
+    <ClCompile Include="src\normalize\manual.cpp" />
     <ClCompile Include="src\normalize\normalize.cpp" />
-    <ClCompile Include="src\structure\segment.cpp" />
-    <ClCompile Include="src\structure\layers.cpp" />
     <ClCompile Include="src\quality\contrast.cpp" />
-    <ClCompile Include="src\quality\shape.cpp" />
-    <ClCompile Include="src\quality\texture.cpp" />
     <ClCompile Include="src\quality\position_size.cpp" />
     <ClCompile Include="src\quality\quality.cpp" />
+    <ClCompile Include="src\quality\shape.cpp" />
+    <ClCompile Include="src\quality\texture.cpp" />
     <ClCompile Include="src\scoring\scoring.cpp" />
+    <ClCompile Include="src\selftest\jaeku.cpp" />
+    <ClCompile Include="src\selftest\junkyu.cpp" />
+    <ClCompile Include="src\selftest\ranju.cpp" />
+    <ClCompile Include="src\structure\layers.cpp" />
+    <ClCompile Include="src\structure\segment.cpp" />
+    <ClCompile Include="src\viz\draw.cpp" />
     <ClCompile Include="src\viz\report.cpp" />
-    <ClCompile Include="src\app\main.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

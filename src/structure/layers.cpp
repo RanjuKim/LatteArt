@@ -1,8 +1,9 @@
+// Owner: Jaeku Kang
 #include <cmath>
 #include <numeric>
 
 #include "core/todo.h"
-#include "structure/structure.h"
+#include "structure/layers.h"
 
 namespace la::structure {
 

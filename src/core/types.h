@@ -1,4 +1,7 @@
-// Shared data contracts between modules. Change only after team agreement.
+// Owner: SHARED - change only with team agreement (PR approved by all)
+// Shared data contracts between modules.
+// Need an extra field for your own module? Put a private struct in YOUR
+// header instead of editing this file.
 //
 // Library rule (assignment spec): only OpenCV I/O is allowed.
 //   Allowed : cv::Mat as a container (constructor, create, clone, rows/cols,
