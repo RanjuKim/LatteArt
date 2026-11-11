@@ -75,7 +75,7 @@ Team 22 · 영상처리 Team Project 02 (Global / Startup 팀)
 |---|---|
 | `LatteArt.exe <기준.jpg> <내것.jpg> tulip:3 [result.png]` | 채점 (최종 프로그램) |
 | `LatteArt.exe --canon <사진> <cx> <cy> <r> <out.png>` | **수동 정규화** (구현 완료). 컵 중심과 반지름을 그림판에서 읽어 넣으면 512 규격 이미지 생성 |
-| `LatteArt.exe --selftest <jaeku\|ranju\|junkyu> ...` | 개인 실험용. 각자 자기 `src/selftest/<이름>.cpp`만 수정 |
+| `LatteArt.exe --debug <단계> ...` | **단계별 디버그 모드.** 한 단계만 실행하고 중간 결과를 `debug_<단계>_*.png`로 저장. 단계: `preprocess`(Junkyu), `normalize`·`layers`(Jaeku), `segment`·`quality`(Ranju), `viz`(Junkyu). 각 단계 파일 `src/debug/<단계>.cpp`는 그 단계 담당자만 수정. 보고서·데모에서 중간 결과를 보여줄 때도 사용 |
 | `LatteArt.exe --batch ...` | 데이터셋 일괄 채점 → CSV (Junkyu 구현) |
 
 ### 정규화 규칙 (모든 모듈 공통 약속)
@@ -100,9 +100,9 @@ Team 22 · 영상처리 Team Project 02 (Global / Startup 팀)
 
 ### 충돌 방지 규칙
 1. **파일 단위 소유.** 모든 소스 파일 첫 줄에 `// Owner: 이름`이 적혀 있습니다. **자기 파일만 수정**합니다.
-2. **공용 파일(SHARED)은 따로 PR + 전원 승인.** `core/types.h`, `core/todo.h`, `io/`, `app/main.cpp`, `selftest/selftest.h`, `LatteArt.vcxproj(.filters)`, `opencv.props`
-3. **실험은 개인 selftest 파일에서.** `--selftest <이름>`으로 실행하고 `main.cpp`는 건드리지 않습니다.
-4. **남의 함수가 필요하면 직접 고치지 말고 담당자에게 요청**합니다(단톡 또는 GitHub Issue). 기다리는 동안에는 자기 selftest 파일 안에 임시 구현을 만들어 씁니다.
+2. **공용 파일(SHARED)은 따로 PR + 전원 승인.** `core/types.h`, `core/todo.h`, `io/`, `app/main.cpp`, `debug/debug.h`, `LatteArt.vcxproj(.filters)`, `opencv.props`
+3. **테스트는 자기 단계의 debug 파일에서.** `--debug <단계>`로 실행하고 `main.cpp`는 건드리지 않습니다.
+4. **남의 함수가 필요하면 직접 고치지 말고 담당자에게 요청**합니다(단톡 또는 GitHub Issue). 기다리는 동안에는 자기 debug 파일 안에 임시 구현을 만들어 씁니다.
 5. **필요한 파일은 이미 전부 만들어 프로젝트에 등록**해 두었습니다. 새 파일 추가는 가급적 피하고, 꼭 필요하면 vcxproj만 고치는 작은 PR을 따로 올립니다.
 6. 내 모듈에만 필요한 구조체는 `types.h`에 넣지 말고 **내 헤더에** 정의합니다.
 
@@ -110,16 +110,16 @@ Team 22 · 영상처리 Team Project 02 (Global / Startup 팀)
 
 | 담당 | 역할 | 소유 파일 |
 |---|---|---|
-| **Jaeku Kang** | 정규화 · 층 수 · 점수 · 전체 연결 | `basic/edge`, `basic/geometry`, `normalize/*`, `structure/layers`, `scoring/*`, `app/pipeline`, `selftest/jaeku.cpp` |
-| **Ranju Kim** | 패턴 분할 · 품질 지표 5개 · FFT | `basic/threshold`, `basic/morphology`, `basic/fft`, `structure/segment`, `quality/*`, `selftest/ranju.cpp` |
-| **Junkyu Kim** | 기초 필터 · 색 변환 · 결과 출력 · 배치 검증 | `basic/filter`, `basic/color`, `basic/clahe`, `viz/*`, `app/batch`, `selftest/junkyu.cpp` |
-| **Cecelia Hein** | **개발 제외.** 자료 수집 · 평가 진행 · 문서 · 발표 | `data/`, `docs/` |
+| **Jaeku Kang** | 정규화 · 층 수 · 점수 · 전체 연결 | `basic/edge`, `basic/geometry`, `normalize/*`, `structure/layers`, `scoring/*`, `app/pipeline`, `debug/normalize.cpp`, `debug/layers.cpp` |
+| **Ranju Kim** | 패턴 분할 · 품질 지표 5개 · FFT | `basic/threshold`, `basic/morphology`, `basic/fft`, `structure/segment`, `quality/*`, `debug/segment.cpp`, `debug/quality.cpp` |
+| **Junkyu Kim** | 기초 필터 · 색 변환 · 결과 출력 · 배치 검증 | `basic/filter`, `basic/color`, `basic/clahe`, `viz/*`, `app/batch`, `debug/preprocess.cpp`, `debug/viz.cpp` |
+| **Cecelia Hein** | 자료 수집 · 평가 진행 · 문서 · 발표 | `data/`, `docs/` |
 
-### Cecelia Hein 담당 업무 (비개발)
-- **촬영 가이드** 작성(영문/국문): 위에서 수직 촬영, 그림자 없이, 컵 전체가 보이게
-- **기준 사진 확보**: 하트·튤립 전문가 사진 (바리스타 지인, 카페 섭외)
+### Cecelia Hein 담당 업무
+- **촬영 가이드** 작성: 위에서 수직 촬영, 그림자 없이, 컵 전체가 보이게
+- **기준 사진 확보**: 하트·튤립 전문가 사진
 - **연습 사진 수집** 약 10장 (하트·튤립 섞어서, 층 수를 맞춘 컵과 틀린 컵을 모두 포함), 각 사진의 **층 수 정답**을 `data/labels.csv`에 기록
-- **`--canon` 이미지 만들기**: 그림판에서 컵 중심(cx, cy)과 반지름(r)을 읽어 실행 (빌드된 exe를 받아서 사용, 코딩 불필요)
+- **`--canon` 이미지 만들기**: 그림판에서 컵 중심(cx, cy)과 반지름(r)을 읽어 실행
 - **블라인드 평가 진행**: 평가자 3명 섭외, 평가표 작성, 점수 수집
 - **회의 기록**: 단톡 캡처와 회의 사진을 `docs/meetings/`에 정리 (보고서 ④)
 - **시장·경쟁 앱 조사** 업데이트, 사업 계획 정리
@@ -146,7 +146,7 @@ Team 22 · 영상처리 Team Project 02 (Global / Startup 팀)
 
 | 기간 | 할 일 | 완료 기준 |
 |---|---|---|
-| 11/12 ~ 11/14 | `sobel`, `canny`, `warpPerspective` (Gaussian이 오기 전에는 selftest 안에 임시 블러) | 실제 사진의 엣지 맵 저장 |
+| 11/12 ~ 11/14 | `sobel`, `canny`, `warpPerspective` (Gaussian이 오기 전에는 `debug/normalize.cpp` 안에 임시 블러) | 실제 사진의 엣지 맵 저장 |
 | 11/15 ~ 11/17 | `findRimPoints`, `fitEllipse`, `normalizeCup`(타원→원, 크기 맞춤), `patternAxisAngleDeg` | 사진 10장이 512 규격으로 자동 정규화 |
 | 11/18 ~ 11/21 | `axisProfile`, `findPeaks`, 간격·두께 CV, FFT 교차검증, U | 기준 사진에서 목표 층 수 검출 |
 | 11/22 | `pipeline` 끝까지 연결 | 사진 2장 → 최종 점수 출력 |
@@ -156,7 +156,7 @@ Team 22 · 영상처리 Team Project 02 (Global / Startup 팀)
 
 | 기간 | 할 일 | 완료 기준 |
 |---|---|---|
-| 11/12 ~ 11/14 | `otsuThreshold`, `binarize`, `erode`/`dilate`, `largestComponent` | selftest로 이진화 결과 저장 |
+| 11/12 ~ 11/14 | `otsuThreshold`, `binarize`, `erode`/`dilate`, `largestComponent` | `--debug segment`로 이진화 결과 저장 |
 | 11/15 | `segmentPattern` → Jaeku에게 전달 | `--canon` 이미지에서 패턴 마스크 저장 |
 | 11/15 ~ 11/17 | `fft`, `magnitudeSpectrum`(→ Jaeku), `evalSize`, `evalPosition` | 크기·위치 점수 출력 |
 | 11/18 ~ 11/20 | `fft2Magnitude`, `evalContrast` (Michelson, 경계 폭, 고주파 비율) | 대비 점수 출력 |
@@ -168,7 +168,7 @@ Team 22 · 영상처리 Team Project 02 (Global / Startup 팀)
 | 기간 | 할 일 | 완료 기준 |
 |---|---|---|
 | **11/12 ~ 11/13** | ★ **`gaussianBlur`, `convolve2D` 최우선** → 바로 main에 머지 | 다른 사람이 사용 가능 |
-| 11/14 ~ 11/17 | `bgrToLab`, `clahe`, `drawLine`/`drawCircle`/`drawCross`/`drawRect` | selftest 이미지에 도형 표시 |
+| 11/14 ~ 11/17 | `bgrToLab`, `clahe`, `drawLine`/`drawCircle`/`drawCross`/`drawRect` | `--debug viz` 이미지에 도형 표시 |
 | 11/18 ~ 11/20 | `drawText` (5×7 비트맵 폰트), `sideBySide`, `printReport` 다듬기 | 점수 글자가 이미지에 표시 |
 | 11/21 ~ 11/22 | `renderResult` (축, 층 위치, 문제 영역 표시) | 결과 이미지 저장 |
 | 11/22 ~ 11/24 | `runBatch` (labels.csv → 결과 CSV) | 전체 사진 일괄 채점 |
@@ -226,7 +226,7 @@ Team 22 · 영상처리 Team Project 02 (Global / Startup 팀)
 | 리스크 | 대응 |
 |---|---|
 | **층 수 판정 정확도** (프로젝트 핵심) | 촬영 가이드로 입력 품질 통제(위에서 수직 촬영, 그림자 없음, 컵 전체가 보이게). 알고리즘 개선보다 효과가 큼 |
-| Gaussian(11/13)이 늦어 Canny·분할이 막힘 | Junkyu 최우선 처리. 늦어지면 각자 selftest 안에 3×3 평균 필터로 임시 대체 |
+| Gaussian(11/13)이 늦어 Canny·분할이 막힘 | Junkyu 최우선 처리. 늦어지면 각자 debug 파일 안에 3×3 평균 필터로 임시 대체 |
 | 자동 정규화(11/17)가 늦음 | 품질·결과 화면은 `--canon` 이미지로 계속 진행 가능 |
 | 타원 피팅 · 호모그래피 구현 난이도 | 일정이 밀리면 "심하게 기운 사진은 재촬영 요청"으로 범위 축소 (기획서에 명시됨) |
 | 사진·평가 데이터가 늦음 | Cecelia 전달 날짜(11/14, 11/21)를 단톡에서 매일 확인 |

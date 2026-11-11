@@ -5,7 +5,7 @@
 //   LatteArt.exe <reference.jpg> <user.jpg> <pattern:layers> [result.png]
 //   LatteArt.exe --canon <photo.jpg> <cx> <cy> <r> <out.png>
 //   LatteArt.exe --batch <args...>
-//   LatteArt.exe --selftest <jaeku|ranju|junkyu> [args...]
+//   LatteArt.exe --debug <stage> [args...]   (see src/debug/debug.h)
 #include <cstdio>
 #include <exception>
 #include <stdexcept>
@@ -16,7 +16,7 @@
 #include "app/pipeline.h"
 #include "io/io.h"
 #include "normalize/manual.h"
-#include "selftest/selftest.h"
+#include "debug/debug.h"
 #include "viz/report.h"
 
 namespace {
@@ -37,7 +37,7 @@ void usage() {
         "  LatteArt.exe <reference.jpg> <user.jpg> <pattern:layers> [result.png]\n"
         "  LatteArt.exe --canon <photo.jpg> <cx> <cy> <r> <out.png>\n"
         "  LatteArt.exe --batch <args...>\n"
-        "  LatteArt.exe --selftest <jaeku|ranju|junkyu> [args...]\n");
+        "  LatteArt.exe --debug <preprocess|normalize|segment|layers|quality|viz> [args...]\n");
 }
 
 int runCanon(int argc, char** argv) {
@@ -53,16 +53,19 @@ int runCanon(int argc, char** argv) {
     return 0;
 }
 
-int runSelftest(int argc, char** argv) {
+int runDebug(int argc, char** argv) {
     if (argc < 3) {
         usage();
         return 1;
     }
-    const std::string who = argv[2];
-    const std::vector<std::string> args(argv + 3, argv + argc);
-    if (who == "jaeku") return la::selftest::jaeku(args);
-    if (who == "ranju") return la::selftest::ranju(args);
-    if (who == "junkyu") return la::selftest::junkyu(args);
+    const std::string stage = argv[2];
+    const la::debug::Args args(argv + 3, argv + argc);
+    if (stage == "preprocess") return la::debug::runPreprocess(args);
+    if (stage == "normalize") return la::debug::runNormalize(args);
+    if (stage == "segment") return la::debug::runSegment(args);
+    if (stage == "layers") return la::debug::runLayers(args);
+    if (stage == "quality") return la::debug::runQuality(args);
+    if (stage == "viz") return la::debug::runViz(args);
     usage();
     return 1;
 }
@@ -101,7 +104,7 @@ int main(int argc, char** argv) {
     try {
         if (mode == "--canon") return runCanon(argc, argv);
         if (mode == "--batch") return la::app::runBatch(argc - 2, argv + 2);
-        if (mode == "--selftest") return runSelftest(argc, argv);
+        if (mode == "--debug") return runDebug(argc, argv);
         if (argc < 4) {
             usage();
             return 1;

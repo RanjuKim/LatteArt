@@ -1,7 +1,7 @@
 # LatteArt Development Plan
 
 Team 22 · Image Processing Team Project 02 (Global / Startup team)
-Written 2026-11-11 (roles and schedule revised) · Original proposal: [Team22_LatteArt_Plan.docx](Team22_LatteArt_Plan.docx) · 한국어: [PLAN.md](PLAN.md)
+Written 2026-11-11 (roles and schedule revised) · Original proposal: [Team22_LatteArt_Plan.docx](Team22_LatteArt_Plan.docx) · 한국어: [PLAN.kr.md](PLAN.kr.md)
 
 ---
 
@@ -75,7 +75,7 @@ Two photos (reference, user) + target pattern (e.g. tulip:3)
 |---|---|
 | `LatteArt.exe <ref.jpg> <mine.jpg> tulip:3 [result.png]` | Scoring (the final program) |
 | `LatteArt.exe --canon <photo> <cx> <cy> <r> <out.png>` | **Manual normalization** (done). Read the cup center and radius in Paint and get a 512 canonical image |
-| `LatteArt.exe --selftest <jaeku\|ranju\|junkyu> ...` | Personal sandbox. Each person edits only their own `src/selftest/<name>.cpp` |
+| `LatteArt.exe --debug <stage> ...` | **Per-stage debug mode.** Runs one stage and saves intermediate results as `debug_<stage>_*.png`. Stages: `preprocess` (Junkyu), `normalize` · `layers` (Jaeku), `segment` · `quality` (Ranju), `viz` (Junkyu). Each `src/debug/<stage>.cpp` is edited only by that stage's owner. Also used to show intermediate results in the report and demo |
 | `LatteArt.exe --batch ...` | Score the whole dataset → CSV (Junkyu) |
 
 ### Normalization contract (shared by all modules)
@@ -100,9 +100,9 @@ Quality weights (draft, to be tuned with data): contrast 30% · shape 25% · tex
 
 ### Conflict rules
 1. **File-level ownership.** The first line of every source file says `// Owner: <name>`. **Edit only your own files.**
-2. **SHARED files need a separate PR approved by everyone:** `core/types.h`, `core/todo.h`, `io/`, `app/main.cpp`, `selftest/selftest.h`, `LatteArt.vcxproj(.filters)`, `opencv.props`
-3. **Experiment in your own selftest file.** Run it with `--selftest <name>`; never edit `main.cpp` for testing.
-4. **Need someone else's function? Ask the owner** (KakaoTalk or a GitHub Issue) instead of editing it. While you wait, write a temporary version inside your own selftest file.
+2. **SHARED files need a separate PR approved by everyone:** `core/types.h`, `core/todo.h`, `io/`, `app/main.cpp`, `debug/debug.h`, `LatteArt.vcxproj(.filters)`, `opencv.props`
+3. **Test in your stage's debug file.** Run it with `--debug <stage>`; never edit `main.cpp` for testing.
+4. **Need someone else's function? Ask the owner** (KakaoTalk or a GitHub Issue) instead of editing it. While you wait, write a temporary version inside your own debug file.
 5. **Every file we need already exists and is registered in the project.** Avoid adding files; if you must, open a small PR that only touches the vcxproj.
 6. Structs needed only by your module go in **your own header**, not `types.h`.
 
@@ -110,16 +110,16 @@ Quality weights (draft, to be tuned with data): contrast 30% · shape 25% · tex
 
 | Owner | Role | Files |
 |---|---|---|
-| **Jaeku Kang** | Normalization · layer count · scoring · wiring the pipeline | `basic/edge`, `basic/geometry`, `normalize/*`, `structure/layers`, `scoring/*`, `app/pipeline`, `selftest/jaeku.cpp` |
-| **Ranju Kim** | Pattern segmentation · five quality metrics · FFT | `basic/threshold`, `basic/morphology`, `basic/fft`, `structure/segment`, `quality/*`, `selftest/ranju.cpp` |
-| **Junkyu Kim** | Basic filters · color conversion · result output · batch validation | `basic/filter`, `basic/color`, `basic/clahe`, `viz/*`, `app/batch`, `selftest/junkyu.cpp` |
-| **Cecelia Hein** | **No coding.** Data collection · rating sessions · documents · presentation | `data/`, `docs/` |
+| **Jaeku Kang** | Normalization · layer count · scoring · wiring the pipeline | `basic/edge`, `basic/geometry`, `normalize/*`, `structure/layers`, `scoring/*`, `app/pipeline`, `debug/normalize.cpp`, `debug/layers.cpp` |
+| **Ranju Kim** | Pattern segmentation · five quality metrics · FFT | `basic/threshold`, `basic/morphology`, `basic/fft`, `structure/segment`, `quality/*`, `debug/segment.cpp`, `debug/quality.cpp` |
+| **Junkyu Kim** | Basic filters · color conversion · result output · batch validation | `basic/filter`, `basic/color`, `basic/clahe`, `viz/*`, `app/batch`, `debug/preprocess.cpp`, `debug/viz.cpp` |
+| **Cecelia Hein** | Data collection · rating sessions · documents · presentation | `data/`, `docs/` |
 
-### Cecelia Hein's tasks (non-development)
-- Write the **shooting guide** (English/Korean): shoot straight down, no shadows, whole cup visible
-- **Get the reference photos**: expert heart and tulip (barista contacts, cafés)
+### Cecelia Hein's tasks
+- Write the **shooting guide**: shoot straight down, no shadows, whole cup visible
+- **Get the reference photos**: expert heart and tulip
 - **Collect about 10 practice photos** (mix of heart and tulip, including cups that hit and miss the target layer count) and record the **true layer count** of each in `data/labels.csv`
-- **Make `--canon` images**: read the cup center (cx, cy) and radius (r) in Paint and run the exe (uses a built exe, no coding)
+- **Make `--canon` images**: read the cup center (cx, cy) and radius (r) in Paint and run the exe
 - **Run the blind rating**: recruit 3 raters, prepare the rating sheet, collect scores
 - **Meeting records**: KakaoTalk captures and meeting photos in `docs/meetings/` (report section 4)
 - Update **market and competitor research**, business plan
@@ -146,7 +146,7 @@ Quality weights (draft, to be tuned with data): contrast 30% · shape 25% · tex
 
 | Dates | Tasks | Done when |
 |---|---|---|
-| Nov 12 – 14 | `sobel`, `canny`, `warpPerspective` (temporary blur in selftest until Gaussian arrives) | Edge map of a real photo saved |
+| Nov 12 – 14 | `sobel`, `canny`, `warpPerspective` (temporary blur in `debug/normalize.cpp` until Gaussian arrives) | Edge map of a real photo saved |
 | Nov 15 – 17 | `findRimPoints`, `fitEllipse`, `normalizeCup` (ellipse → circle, scale), `patternAxisAngleDeg` | 10 photos normalized to 512 automatically |
 | Nov 18 – 21 | `axisProfile`, `findPeaks`, spacing/thickness CV, FFT cross-check, U | Target layer count detected on reference photos |
 | Nov 22 | Wire `pipeline` end to end | Two photos → final score printed |
@@ -156,7 +156,7 @@ Quality weights (draft, to be tuned with data): contrast 30% · shape 25% · tex
 
 | Dates | Tasks | Done when |
 |---|---|---|
-| Nov 12 – 14 | `otsuThreshold`, `binarize`, `erode`/`dilate`, `largestComponent` | Binarized result saved via selftest |
+| Nov 12 – 14 | `otsuThreshold`, `binarize`, `erode`/`dilate`, `largestComponent` | Binarized result saved via `--debug segment` |
 | Nov 15 | `segmentPattern` → hand to Jaeku | Pattern mask saved from a `--canon` image |
 | Nov 15 – 17 | `fft`, `magnitudeSpectrum` (→ Jaeku), `evalSize`, `evalPosition` | Size and position scores printed |
 | Nov 18 – 20 | `fft2Magnitude`, `evalContrast` (Michelson, edge width, high-frequency ratio) | Contrast score printed |
@@ -168,7 +168,7 @@ Quality weights (draft, to be tuned with data): contrast 30% · shape 25% · tex
 | Dates | Tasks | Done when |
 |---|---|---|
 | **Nov 12 – 13** | ★ **`gaussianBlur`, `convolve2D` first** → merge to main right away | Others can use them |
-| Nov 14 – 17 | `bgrToLab`, `clahe`, `drawLine`/`drawCircle`/`drawCross`/`drawRect` | Shapes drawn on a selftest image |
+| Nov 14 – 17 | `bgrToLab`, `clahe`, `drawLine`/`drawCircle`/`drawCross`/`drawRect` | Shapes drawn on the `--debug viz` image |
 | Nov 18 – 20 | `drawText` (5×7 bitmap font), `sideBySide`, polish `printReport` | Score text shown on the image |
 | Nov 21 – 22 | `renderResult` (axis, layer positions, problem areas) | Result image saved |
 | Nov 22 – 24 | `runBatch` (labels.csv → result CSV) | Whole dataset scored in one run |
@@ -226,7 +226,7 @@ Quality weights (draft, to be tuned with data): contrast 30% · shape 25% · tex
 | Risk | Mitigation |
 |---|---|
 | **Layer-count accuracy** (core of the project) | Control input quality with a shooting guide (shoot straight down, no shadows, whole cup visible). This helps more than algorithm tweaks |
-| Gaussian (Nov 13) is late, blocking Canny and segmentation | Junkyu's top priority. If late, use a temporary 3×3 box filter inside your selftest |
+| Gaussian (Nov 13) is late, blocking Canny and segmentation | Junkyu's top priority. If late, use a temporary 3×3 box filter inside your debug file |
 | Automatic normalization (Nov 17) is late | Quality and result-image work continue on `--canon` images |
 | Ellipse fitting / homography are hard to implement | If behind schedule, reduce scope to "ask for a retake when the photo is heavily tilted" (already stated in the proposal) |
 | Photos or ratings arrive late | Check Cecelia's hand-off dates (Nov 14, 21) daily in the group chat |

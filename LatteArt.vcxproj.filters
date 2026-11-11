@@ -4,11 +4,11 @@
     <Filter Include="app"><UniqueIdentifier>{A1F0C001-0000-4000-8000-000000000001}</UniqueIdentifier></Filter>
     <Filter Include="basic"><UniqueIdentifier>{A1F0C001-0000-4000-8000-000000000002}</UniqueIdentifier></Filter>
     <Filter Include="core"><UniqueIdentifier>{A1F0C001-0000-4000-8000-000000000003}</UniqueIdentifier></Filter>
-    <Filter Include="io"><UniqueIdentifier>{A1F0C001-0000-4000-8000-000000000004}</UniqueIdentifier></Filter>
-    <Filter Include="normalize"><UniqueIdentifier>{A1F0C001-0000-4000-8000-000000000005}</UniqueIdentifier></Filter>
-    <Filter Include="quality"><UniqueIdentifier>{A1F0C001-0000-4000-8000-000000000006}</UniqueIdentifier></Filter>
-    <Filter Include="scoring"><UniqueIdentifier>{A1F0C001-0000-4000-8000-000000000007}</UniqueIdentifier></Filter>
-    <Filter Include="selftest"><UniqueIdentifier>{A1F0C001-0000-4000-8000-000000000008}</UniqueIdentifier></Filter>
+    <Filter Include="debug"><UniqueIdentifier>{A1F0C001-0000-4000-8000-000000000004}</UniqueIdentifier></Filter>
+    <Filter Include="io"><UniqueIdentifier>{A1F0C001-0000-4000-8000-000000000005}</UniqueIdentifier></Filter>
+    <Filter Include="normalize"><UniqueIdentifier>{A1F0C001-0000-4000-8000-000000000006}</UniqueIdentifier></Filter>
+    <Filter Include="quality"><UniqueIdentifier>{A1F0C001-0000-4000-8000-000000000007}</UniqueIdentifier></Filter>
+    <Filter Include="scoring"><UniqueIdentifier>{A1F0C001-0000-4000-8000-000000000008}</UniqueIdentifier></Filter>
     <Filter Include="structure"><UniqueIdentifier>{A1F0C001-0000-4000-8000-000000000009}</UniqueIdentifier></Filter>
     <Filter Include="viz"><UniqueIdentifier>{A1F0C001-0000-4000-8000-000000000010}</UniqueIdentifier></Filter>
   </ItemGroup>
@@ -25,12 +25,12 @@
     <ClInclude Include="src\basic\threshold.h"><Filter>basic</Filter></ClInclude>
     <ClInclude Include="src\core\todo.h"><Filter>core</Filter></ClInclude>
     <ClInclude Include="src\core\types.h"><Filter>core</Filter></ClInclude>
+    <ClInclude Include="src\debug\debug.h"><Filter>debug</Filter></ClInclude>
     <ClInclude Include="src\io\io.h"><Filter>io</Filter></ClInclude>
     <ClInclude Include="src\normalize\manual.h"><Filter>normalize</Filter></ClInclude>
     <ClInclude Include="src\normalize\normalize.h"><Filter>normalize</Filter></ClInclude>
     <ClInclude Include="src\quality\quality.h"><Filter>quality</Filter></ClInclude>
     <ClInclude Include="src\scoring\scoring.h"><Filter>scoring</Filter></ClInclude>
-    <ClInclude Include="src\selftest\selftest.h"><Filter>selftest</Filter></ClInclude>
     <ClInclude Include="src\structure\layers.h"><Filter>structure</Filter></ClInclude>
     <ClInclude Include="src\structure\segment.h"><Filter>structure</Filter></ClInclude>
     <ClInclude Include="src\viz\draw.h"><Filter>viz</Filter></ClInclude>
@@ -48,6 +48,12 @@
     <ClCompile Include="src\basic\geometry.cpp"><Filter>basic</Filter></ClCompile>
     <ClCompile Include="src\basic\morphology.cpp"><Filter>basic</Filter></ClCompile>
     <ClCompile Include="src\basic\threshold.cpp"><Filter>basic</Filter></ClCompile>
+    <ClCompile Include="src\debug\layers.cpp"><Filter>debug</Filter></ClCompile>
+    <ClCompile Include="src\debug\normalize.cpp"><Filter>debug</Filter></ClCompile>
+    <ClCompile Include="src\debug\preprocess.cpp"><Filter>debug</Filter></ClCompile>
+    <ClCompile Include="src\debug\quality.cpp"><Filter>debug</Filter></ClCompile>
+    <ClCompile Include="src\debug\segment.cpp"><Filter>debug</Filter></ClCompile>
+    <ClCompile Include="src\debug\viz.cpp"><Filter>debug</Filter></ClCompile>
     <ClCompile Include="src\io\io.cpp"><Filter>io</Filter></ClCompile>
     <ClCompile Include="src\normalize\manual.cpp"><Filter>normalize</Filter></ClCompile>
     <ClCompile Include="src\normalize\normalize.cpp"><Filter>normalize</Filter></ClCompile>
@@ -57,9 +63,6 @@
     <ClCompile Include="src\quality\shape.cpp"><Filter>quality</Filter></ClCompile>
     <ClCompile Include="src\quality\texture.cpp"><Filter>quality</Filter></ClCompile>
     <ClCompile Include="src\scoring\scoring.cpp"><Filter>scoring</Filter></ClCompile>
-    <ClCompile Include="src\selftest\jaeku.cpp"><Filter>selftest</Filter></ClCompile>
-    <ClCompile Include="src\selftest\junkyu.cpp"><Filter>selftest</Filter></ClCompile>
-    <ClCompile Include="src\selftest\ranju.cpp"><Filter>selftest</Filter></ClCompile>
     <ClCompile Include="src\structure\layers.cpp"><Filter>structure</Filter></ClCompile>
     <ClCompile Include="src\structure\segment.cpp"><Filter>structure</Filter></ClCompile>
     <ClCompile Include="src\viz\draw.cpp"><Filter>viz</Filter></ClCompile>

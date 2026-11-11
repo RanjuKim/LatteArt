@@ -45,6 +45,7 @@
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
+      <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <AdditionalIncludeDirectories>$(ProjectDir)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -84,12 +85,12 @@
     <ClInclude Include="src\basic\threshold.h" />
     <ClInclude Include="src\core\todo.h" />
     <ClInclude Include="src\core\types.h" />
+    <ClInclude Include="src\debug\debug.h" />
     <ClInclude Include="src\io\io.h" />
     <ClInclude Include="src\normalize\manual.h" />
     <ClInclude Include="src\normalize\normalize.h" />
     <ClInclude Include="src\quality\quality.h" />
     <ClInclude Include="src\scoring\scoring.h" />
-    <ClInclude Include="src\selftest\selftest.h" />
     <ClInclude Include="src\structure\layers.h" />
     <ClInclude Include="src\structure\segment.h" />
     <ClInclude Include="src\viz\draw.h" />
@@ -107,6 +108,12 @@
     <ClCompile Include="src\basic\geometry.cpp" />
     <ClCompile Include="src\basic\morphology.cpp" />
     <ClCompile Include="src\basic\threshold.cpp" />
+    <ClCompile Include="src\debug\layers.cpp" />
+    <ClCompile Include="src\debug\normalize.cpp" />
+    <ClCompile Include="src\debug\preprocess.cpp" />
+    <ClCompile Include="src\debug\quality.cpp" />
+    <ClCompile Include="src\debug\segment.cpp" />
+    <ClCompile Include="src\debug\viz.cpp" />
     <ClCompile Include="src\io\io.cpp" />
     <ClCompile Include="src\normalize\manual.cpp" />
     <ClCompile Include="src\normalize\normalize.cpp" />
@@ -116,9 +123,6 @@
     <ClCompile Include="src\quality\shape.cpp" />
     <ClCompile Include="src\quality\texture.cpp" />
     <ClCompile Include="src\scoring\scoring.cpp" />
-    <ClCompile Include="src\selftest\jaeku.cpp" />
-    <ClCompile Include="src\selftest\junkyu.cpp" />
-    <ClCompile Include="src\selftest\ranju.cpp" />
     <ClCompile Include="src\structure\layers.cpp" />
     <ClCompile Include="src\structure\segment.cpp" />
     <ClCompile Include="src\viz\draw.cpp" />

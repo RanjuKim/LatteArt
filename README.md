@@ -33,23 +33,23 @@ structure first (layer count), then quality (contrast, shape, texture, position,
 ```
 bin\Release\LatteArt.exe data\reference\tulip3.jpg data\user\tulip3_junkyu_01.jpg tulip:3 result.png
 bin\Release\LatteArt.exe --canon photo.jpg <cx> <cy> <r> canon.png     # manual normalization to 512x512
-bin\Release\LatteArt.exe --selftest <jaeku|ranju|junkyu> [args...]      # personal sandbox
+bin\Release\LatteArt.exe --debug <stage> [args...]                     # run one stage, save debug_<stage>_*.png
 bin\Release\LatteArt.exe --batch [args...]                               # score the whole dataset
 ```
 Unimplemented steps throw `TODO: ...` and the program prints which stage stopped.
 
 ## Owners
 
-Full plan, file ownership rules and per-person schedule: **[docs/PLAN.en.md](docs/PLAN.en.md)** (한국어: [docs/PLAN.md](docs/PLAN.md)).
+Full plan, file ownership rules and per-person schedule: **[docs/PLAN.en.md](docs/PLAN.en.md)** (한국어: [docs/PLAN.kr.md](docs/PLAN.kr.md)).
 The first line of every source file says `// Owner: <name>` — edit only your own files.
 
 | Owner | Files |
 |---|---|
-| Jaeku Kang | `basic/edge`, `basic/geometry`, `normalize/*`, `structure/layers`, `scoring/*`, `app/pipeline`, `selftest/jaeku.cpp` |
-| Ranju Kim | `basic/threshold`, `basic/morphology`, `basic/fft`, `structure/segment`, `quality/*`, `selftest/ranju.cpp` |
-| Junkyu Kim | `basic/filter`, `basic/color`, `basic/clahe`, `viz/*`, `app/batch`, `selftest/junkyu.cpp` |
-| Cecelia Hein | No coding: `data/` (photos, labels, ratings), `docs/` (meetings, report, slides, demo video) |
-| SHARED (PR approved by all) | `core/*`, `io/*`, `app/main.cpp`, `selftest/selftest.h`, `LatteArt.vcxproj(.filters)`, `opencv.props` |
+| Jaeku Kang | `basic/edge`, `basic/geometry`, `normalize/*`, `structure/layers`, `scoring/*`, `app/pipeline`, `debug/normalize.cpp`, `debug/layers.cpp` |
+| Ranju Kim | `basic/threshold`, `basic/morphology`, `basic/fft`, `structure/segment`, `quality/*`, `debug/segment.cpp`, `debug/quality.cpp` |
+| Junkyu Kim | `basic/filter`, `basic/color`, `basic/clahe`, `viz/*`, `app/batch`, `debug/preprocess.cpp`, `debug/viz.cpp` |
+| Cecelia Hein | `data/` (photos, labels, ratings), `docs/` (meetings, report, slides, demo video) |
+| SHARED (PR approved by all) | `core/*`, `io/*`, `app/main.cpp`, `debug/debug.h`, `LatteArt.vcxproj(.filters)`, `opencv.props` |
 
 ### Normalized frame (contract)
 Every `NormalizedCup` is 512×512, cup rim radius 240 px centered, pattern main axis pointing **up**.
