@@ -47,8 +47,8 @@ The first line of every source file says `// Owner: <name>` — edit only your o
 |---|---|
 | Jaeku Kang | `basic/edge`, `basic/geometry`, `normalize/*`, `structure/layers`, `scoring/*`, `app/pipeline`, `debug/normalize.cpp`, `debug/layers.cpp` |
 | Ranju Kim | `basic/threshold`, `basic/morphology`, `basic/fft`, `structure/segment`, `quality/*`, `debug/segment.cpp`, `debug/quality.cpp` |
-| Junkyu Kim | `basic/filter`, `basic/color`, `basic/clahe`, `viz/*`, `app/batch`, `debug/preprocess.cpp`, `debug/viz.cpp` |
-| Cecelia Hein | `data/` (photos, labels, ratings), `docs/` (meetings, report, slides, demo video) |
+| Junkyu Kim | `basic/filter`, `basic/color`, `basic/clahe`, `viz/report`, `app/batch`, `debug/preprocess.cpp` |
+| Cecelia Hein | `viz/draw`, `debug/viz.cpp`, `data/` (photos, labels, ratings), `docs/` (meetings, report, slides, demo video) |
 | SHARED (PR approved by all) | `core/*`, `io/*`, `app/main.cpp`, `debug/debug.h`, `LatteArt.vcxproj(.filters)`, `opencv.props` |
 
 ### Normalized frame (contract)

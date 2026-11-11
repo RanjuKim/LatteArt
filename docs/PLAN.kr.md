@@ -75,7 +75,7 @@ Team 22 · 영상처리 Team Project 02 (Global / Startup 팀)
 |---|---|
 | `LatteArt.exe <기준.jpg> <내것.jpg> tulip:3 [result.png]` | 채점 (최종 프로그램) |
 | `LatteArt.exe --canon <사진> <cx> <cy> <r> <out.png>` | **수동 정규화** (구현 완료). 컵 중심과 반지름을 그림판에서 읽어 넣으면 512 규격 이미지 생성 |
-| `LatteArt.exe --debug <단계> ...` | **단계별 디버그 모드.** 한 단계만 실행하고 중간 결과를 `debug_<단계>_*.png`로 저장. 단계: `preprocess`(Junkyu), `normalize`·`layers`(Jaeku), `segment`·`quality`(Ranju), `viz`(Junkyu). 각 단계 파일 `src/debug/<단계>.cpp`는 그 단계 담당자만 수정. 보고서·데모에서 중간 결과를 보여줄 때도 사용 |
+| `LatteArt.exe --debug <단계> ...` | **단계별 디버그 모드.** 한 단계만 실행하고 중간 결과를 `debug_<단계>_*.png`로 저장. 단계: `preprocess`(Junkyu), `normalize`·`layers`(Jaeku), `segment`·`quality`(Ranju), `viz`(Cecelia). 각 단계 파일 `src/debug/<단계>.cpp`는 그 단계 담당자만 수정. 보고서·데모에서 중간 결과를 보여줄 때도 사용 |
 | `LatteArt.exe --batch ...` | 데이터셋 일괄 채점 → CSV (Junkyu 구현) |
 
 ### 정규화 규칙 (모든 모듈 공통 약속)
@@ -112,10 +112,11 @@ Team 22 · 영상처리 Team Project 02 (Global / Startup 팀)
 |---|---|---|
 | **Jaeku Kang** | 정규화 · 층 수 · 점수 · 전체 연결 | `basic/edge`, `basic/geometry`, `normalize/*`, `structure/layers`, `scoring/*`, `app/pipeline`, `debug/normalize.cpp`, `debug/layers.cpp` |
 | **Ranju Kim** | 패턴 분할 · 품질 지표 5개 · FFT | `basic/threshold`, `basic/morphology`, `basic/fft`, `structure/segment`, `quality/*`, `debug/segment.cpp`, `debug/quality.cpp` |
-| **Junkyu Kim** | 기초 필터 · 색 변환 · 결과 출력 · 배치 검증 | `basic/filter`, `basic/color`, `basic/clahe`, `viz/*`, `app/batch`, `debug/preprocess.cpp`, `debug/viz.cpp` |
-| **Cecelia Hein** | 자료 수집 · 평가 진행 · 문서 · 발표 | `data/`, `docs/` |
+| **Junkyu Kim** | 기초 필터 · 색 변환 · 결과 출력 · 배치 검증 | `basic/filter`, `basic/color`, `basic/clahe`, `viz/report`, `app/batch`, `debug/preprocess.cpp` |
+| **Cecelia Hein** | 결과 이미지 그리기 함수 · 자료 수집 · 평가 진행 · 문서 · 발표 | `viz/draw`, `debug/viz.cpp`, `data/`, `docs/` |
 
 ### Cecelia Hein 담당 업무
+- **결과 이미지 그리기 함수** (`src/viz/draw.cpp`): 사각형·십자 → 이미지 나란히 붙이기 → 글자(5×7 폰트) → 직선·원 순서로 구현. 함수마다 방법이 주석으로 적혀 있음. `--debug viz`로 결과 확인. 직선·원이 어려우면 Junkyu에게 넘김
 - **기준 사진 확보**: 하트·튤립 전문가 사진
 - **연습 사진 수집** 약 10장 (하트·튤립 섞어서, 층 수를 맞춘 컵과 틀린 컵을 모두 포함), 각 사진의 **층 수 정답**을 `data/labels.csv`에 기록
 - **`--canon` 이미지 만들기**: 그림판에서 컵 중심(cx, cy)과 반지름(r)을 읽어 실행
@@ -134,6 +135,7 @@ Team 22 · 영상처리 Team Project 02 (Global / Startup 팀)
 |---|---|---|
 | **11/13** | `gaussianBlur`, `convolve2D` | Junkyu → Jaeku (Canny), Ranju (분할, LoG) |
 | **11/14** | 기준 사진 2장 + 연습 사진 약 10장 (원본, `--canon` 이미지, 층 수 정답) | Cecelia → 개발 3명 |
+| **11/20** | 그리기 함수 (`drawRect`, `drawCross`, `sideBySide`, `drawText`, `drawLine`, `drawCircle`) | Cecelia → Junkyu (결과 이미지) |
 | **11/15** | `segmentPattern` | Ranju → Jaeku (패턴 축 PCA) |
 | **11/17** | `fft`, `magnitudeSpectrum` | Ranju → Jaeku (층 수 교차검증) |
 | **11/17** | `normalizeCup` | Jaeku → 전원 |
@@ -167,9 +169,9 @@ Team 22 · 영상처리 Team Project 02 (Global / Startup 팀)
 | 기간 | 할 일 | 완료 기준 |
 |---|---|---|
 | **11/12 ~ 11/13** | ★ **`gaussianBlur`, `convolve2D` 최우선** → 바로 main에 머지 | 다른 사람이 사용 가능 |
-| 11/14 ~ 11/17 | `bgrToLab`, `clahe`, `drawLine`/`drawCircle`/`drawCross`/`drawRect` | `--debug viz` 이미지에 도형 표시 |
-| 11/18 ~ 11/20 | `drawText` (5×7 비트맵 폰트), `sideBySide`, `printReport` 다듬기 | 점수 글자가 이미지에 표시 |
-| 11/21 ~ 11/22 | `renderResult` (축, 층 위치, 문제 영역 표시) | 결과 이미지 저장 |
+| 11/14 ~ 11/17 | `bgrToLab`, `clahe` | `--debug preprocess`로 결과 저장 |
+| 11/18 ~ 11/20 | `printReport` 다듬기, `runBatch` 준비 (labels.csv 읽기) | 콘솔 리포트 완성 |
+| 11/21 ~ 11/22 | `renderResult` (축, 층 위치, 문제 영역 표시. Cecelia의 그리기 함수 사용) | 결과 이미지 저장 |
 | 11/22 ~ 11/24 | `runBatch` (labels.csv → 결과 CSV) | 전체 사진 일괄 채점 |
 | 11/25 ~ 11/26 | 사람 평가와 비교 (10장 순위 비교, Spearman은 참고값), 층 수 정확도 표 | 보고서용 수치 |
 
@@ -177,7 +179,10 @@ Team 22 · 영상처리 Team Project 02 (Global / Startup 팀)
 
 | 기간 | 할 일 | 완료 기준 |
 |---|---|---|
+| 11/12 ~ 11/13 | 개발 환경 설치 (README 참고), `drawRect`, `drawCross` | `--debug viz`에 사각형·십자 표시 |
 | 11/12 ~ 11/14 | 기준 사진(하트·튤립) 확보, **연습 사진 약 10장 수집**, 층 수 정답 기록, `--canon` 이미지 | **11/14 전달** |
+| 11/15 ~ 11/17 | `sideBySide`, `drawText` (5×7 폰트 표 입력) | 두 컵이 나란히, 점수 글자 표시 |
+| 11/18 ~ 11/20 | `drawLine`, `drawCircle` (어려우면 Junkyu에게 넘김) | **11/20 전달** |
 | 11/15 ~ 11/19 | 흐리거나 기울어 쓸 수 없는 사진 재촬영, 발표 시연용 사진 2~3장 별도 확보 | 11/19까지 |
 | 11/15 ~ 11/21 | 블라인드 평가 (평가자 3명, 사진 10장) | **11/21 전달** |
 | 11/23 ~ 11/28 | 보고서 초안(①③④⑤⑥), 발표 자료 초안, 시장 조사 업데이트 | 초안 공유 |
