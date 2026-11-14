@@ -8,11 +8,11 @@
 ipch/
 
 # Build output (included in the submission zip, not in git)
-bin/
-build/
-x64/
-Debug/
-Release/
+/bin/
+/build/
+/x64/
+/Debug/
+/Release/
 
 # Runtime output
 result*.png
