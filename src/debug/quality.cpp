@@ -3,6 +3,7 @@
 //   Always runs the self-tests for the finished quality items.
 //   With two canonical images it scores each quality item on its own, so
 //   finished items print even while others are still TODO.
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <exception>
@@ -10,6 +11,7 @@
 #include <stdexcept>
 #include <string>
 
+#include "basic/filter.h"
 #include "debug/debug.h"
 #include "io/io.h"
 #include "normalize/manual.h"
@@ -76,10 +78,212 @@ void testSizeAndPosition() {
           "size: no pattern -> score 0, even vs a tiny reference");
 }
 
+// ---------------------------------------------------------------------------
+// Synthetic canonical cups for contrast / shape / texture.
+
+constexpr int N = kCanonicalSize;
+
+bool has(const std::string& s, const char* part) { return s.find(part) != std::string::npos; }
+
+// Deterministic noise in [-amp, amp].
+struct Noise {
+    unsigned s = 2024;
+    float operator()(float amp) {
+        s = s * 1103515245u + 12345u;
+        return amp * (static_cast<float>((s >> 8) & 0xFFFF) / 32767.5f - 1.f);
+    }
+};
+
+using GrayFn = std::function<float(int x, int y)>;
+
+// Builds a gray image from fn, optionally blurs it, and wraps it as a cup.
+NormalizedCup makeCup(const GrayFn& fn, float blurSigma = 0.f) {
+    cv::Mat g(N, N, CV_32FC1);
+    for (int y = 0; y < N; ++y)
+        for (int x = 0; x < N; ++x) g.ptr<float>(y)[x] = fn(x, y);
+    if (blurSigma > 0.f) g = basic::gaussianBlur(g, blurSigma);
+    cv::Mat bgr(N, N, CV_8UC3);
+    for (int y = 0; y < N; ++y)
+        for (int x = 0; x < N; ++x) {
+            const uchar v = static_cast<uchar>(std::clamp(g.ptr<float>(y)[x], 0.f, 1.f) * 255.f + 0.5f);
+            uchar* p = bgr.ptr<uchar>(y) + 3 * x;
+            p[0] = p[1] = p[2] = v;
+        }
+    return normalize::fromCanonicalImage(bgr);
+}
+
+PatternMask maskFrom(const std::function<bool(int x, int y)>& inside) {
+    PatternMask pm;
+    pm.mask = cv::Mat(N, N, CV_8UC1);
+    double sx = 0, sy = 0, n = 0;
+    for (int y = 0; y < N; ++y)
+        for (int x = 0; x < N; ++x) {
+            const bool in = inside(x, y);
+            pm.mask.ptr<uchar>(y)[x] = in ? 255 : 0;
+            if (in) { sx += x + 0.5; sy += y + 0.5; n += 1; }
+        }
+    pm.area = static_cast<float>(n);
+    pm.centroid = n > 0 ? cv::Point2f(float(sx / n), float(sy / n)) : cv::Point2f(256.f, 256.f);
+    return pm;
+}
+
+bool inDisk(int x, int y, float cx, float cy, float r) {
+    const float dx = x + 0.5f - cx, dy = y + 0.5f - cy;
+    return dx * dx + dy * dy <= r * r;
+}
+
+PatternMask disk(float cx, float cy, float r) {
+    return maskFrom([=](int x, int y) { return inDisk(x, y, cx, cy, r); });
+}
+
+// Foam disk of radius 100 at the cup center on crema.
+GrayFn foamOnCrema(float foam, float crema) {
+    return [=](int x, int y) { return inDisk(x, y, 256.f, 256.f, 100.f) ? foam : crema; };
+}
+
+void testContrast() {
+    const PatternMask m = disk(256.f, 256.f, 100.f);
+    const NormalizedCup crisp = makeCup(foamOnCrema(0.9f, 0.3f));
+
+    const ItemScore same = quality::evalContrast(crisp, m, crisp, m);
+    check(same.score > 0.99f && has(same.feedback, "match"), "contrast: identical -> score 1");
+    check(std::abs(same.raw - 0.5f) < 0.01f, "contrast: Michelson (0.9-0.3)/(0.9+0.3) = 0.5");
+
+    const ItemScore dull = quality::evalContrast(makeCup(foamOnCrema(0.55f, 0.3f)), m, crisp, m);
+    check(dull.score < 0.8f && has(dull.feedback, "contrast is lower"), "contrast: dull foam -> 'contrast is lower'");
+
+    const ItemScore blurry = quality::evalContrast(makeCup(foamOnCrema(0.9f, 0.3f), 4.f), m, crisp, m);
+    check(blurry.score < 0.9f && has(blurry.feedback, "blurrier"), "contrast: blurred boundary -> 'blurrier'");
+
+    const ItemScore better = quality::evalContrast(makeCup(foamOnCrema(0.95f, 0.2f)), m, crisp, m);
+    check(better.score > 0.99f, "contrast: more contrast than the reference -> no deduction");
+
+    const ItemScore none = quality::evalContrast(crisp, PatternMask{}, crisp, m);
+    check(none.score == 0.f && none.feedback == "No pattern detected.", "contrast: no pattern -> score 0");
+
+    // A crisp pattern whose foam runs into the cup rim: the cut at the cup
+    // edge must not be measured as a blurry boundary.
+    const PatternMask topMask = maskFrom([](int x, int y) {
+        return inDisk(x, y, 256.f, 110.f, 150.f) && inDisk(x, y, 256.f, 256.f, 234.f);
+    });
+    const NormalizedCup touching =
+        makeCup([](int x, int y) { return inDisk(x, y, 256.f, 110.f, 150.f) ? 0.9f : 0.3f; });
+    const ItemScore rim = quality::evalContrast(touching, topMask, crisp, m);
+    std::printf("       (foam touching the rim: %s)\n", rim.feedback.c_str());
+    check(!has(rim.feedback, "blurrier") && rim.score > 0.85f,
+          "contrast: crisp foam touching the rim is not called blurry");
+
+    // "Foam" darker than the crema (wrong segmentation) must not score.
+    const ItemScore inverted = quality::evalContrast(makeCup(foamOnCrema(0.2f, 0.6f)), m, crisp, m);
+    check(inverted.score == 0.f && has(inverted.feedback, "Cannot separate"),
+          "contrast: foam darker than crema -> not measurable, score 0");
+}
+
+void testShape() {
+    const PatternMask ref = disk(256.f, 256.f, 100.f);
+    const ItemScore same = quality::evalShape(ref, ref);
+    check(same.score > 0.99f && has(same.feedback, "matches"), "shape: identical -> score 1");
+
+    // Same shape, smaller and shifted: aligning size and position must cancel that.
+    const ItemScore scaled = quality::evalShape(disk(230.f, 280.f, 70.f), ref);
+    check(scaled.score > 0.9f, "shape: smaller, shifted copy -> still high score");
+
+    // Disk with an extra lobe on the right: less symmetric than the reference.
+    const PatternMask lobed = maskFrom([](int x, int y) {
+        return inDisk(x, y, 256.f, 256.f, 100.f) || inDisk(x, y, 350.f, 256.f, 45.f);
+    });
+    const ItemScore asym = quality::evalShape(lobed, ref);
+    std::printf("       (lobed: symmetry %.3f vs %.3f, score %.3f, %s)\n", asym.raw, asym.ref, asym.score,
+                asym.feedback.c_str());
+    check(asym.raw < asym.ref && asym.score < 0.9f && has(asym.feedback, "less symmetric"),
+          "shape: one-sided lobe -> 'less symmetric'");
+
+    // Downward triangle (a heart tip without the lobes) vs disk: different form.
+    const PatternMask tri = maskFrom([](int x, int y) {
+        const float t = (y + 0.5f - 160.f) / 200.f;  // 0 at top, 1 at the tip
+        return t >= 0.f && t <= 1.f && std::abs(x + 0.5f - 256.f) <= 110.f * (1.f - t);
+    });
+    const ItemScore other = quality::evalShape(tri, ref);
+    check(other.score < scaled.score - 0.1f, "shape: triangle vs disk scores clearly lower than a scaled disk");
+
+    check(quality::evalShape(PatternMask{}, ref).score == 0.f, "shape: no pattern -> score 0");
+
+    PatternMask broken = maskFrom([](int, int) { return false; });
+    broken.area = 500.f;  // inconsistent: area says 500 px, mask is empty
+    const ItemScore bad = quality::evalShape(broken, ref);
+    check(bad.score == 0.f && std::isfinite(bad.score), "shape: area > 0 but empty mask -> 0, no NaN");
+}
+
+void testTexture() {
+    const PatternMask m = disk(256.f, 256.f, 150.f);
+    Noise noise;
+    // Smooth foam with a little sensor noise.
+    auto smoothFn = [&](float amp) {
+        return [=, &noise](int x, int y) {
+            return inDisk(x, y, 256.f, 256.f, 150.f) ? 0.85f + noise(amp) : 0.3f;
+        };
+    };
+    const NormalizedCup smooth = makeCup(smoothFn(0.01f));
+
+    const ItemScore same = quality::evalTexture(smooth, m, smooth, m);
+    check(same.score > 0.99f && has(same.feedback, "matches"), "texture: identical -> score 1");
+
+    // 25 dark bubbles (radius 3, 0.3 darker) on a 5x5 grid inside the foam.
+    auto bubbleFn = [&](int x, int y) {
+        if (!inDisk(x, y, 256.f, 256.f, 150.f)) return 0.3f;
+        for (int i = 0; i < 5; ++i)
+            for (int j = 0; j < 5; ++j)
+                if (inDisk(x, y, 176.f + 40.f * i, 176.f + 40.f * j, 3.f)) return 0.55f;
+        return 0.85f + noise(0.01f);
+    };
+    const ItemScore bubbly = quality::evalTexture(makeCup(bubbleFn), m, smooth, m);
+    std::printf("       (bubbly foam feedback: %s)\n", bubbly.feedback.c_str());
+    check(bubbly.score < 0.9f && has(bubbly.feedback, "Visible bubbles") && has(bubbly.feedback, "(25 found"),
+          "texture: 25 bubbles -> all 25 found, 'Visible bubbles'");
+
+    const ItemScore rough = quality::evalTexture(makeCup(smoothFn(0.12f)), m, smooth, m);
+    check(rough.raw < rough.ref && rough.score < 0.9f, "texture: rough foam -> lower homogeneity and score");
+
+    // Reference with specular highlights (3% bright pixels), user without.
+    auto glossyFn = [&](int x, int y) {
+        if (!inDisk(x, y, 256.f, 256.f, 150.f)) return 0.3f;
+        return ((x * 7 + y * 13) % 33 == 0) ? 1.f : 0.85f + noise(0.01f);
+    };
+    const ItemScore matte = quality::evalTexture(smooth, m, makeCup(glossyFn), m);
+    check(matte.score < 1.f && has(matte.feedback, "less glossy"), "texture: no highlights vs glossy -> 'less glossy'");
+
+    // Much more shine (30% of the foam) must count as MORE glossy, not less.
+    auto veryGlossyFn = [&](int x, int y) {
+        if (!inDisk(x, y, 256.f, 256.f, 150.f)) return 0.3f;
+        return ((x * 7 + y * 13) % 10 < 3) ? 1.f : 0.85f + noise(0.01f);
+    };
+    const NormalizedCup veryGlossy = makeCup(veryGlossyFn);
+    const ItemScore shiny = quality::evalTexture(veryGlossy, m, makeCup(glossyFn), m);
+    check(!has(shiny.feedback, "less glossy"), "texture: 30% highlights vs 3% -> not 'less glossy'");
+    const ItemScore dull = quality::evalTexture(makeCup(glossyFn), m, veryGlossy, m);
+    check(has(dull.feedback, "less glossy"), "texture: 3% highlights vs 30% -> 'less glossy'");
+
+    // Same foam photographed brighter: texture must not change.
+    const NormalizedCup brighter = makeCup([&](int x, int y) {
+        return inDisk(x, y, 256.f, 256.f, 150.f) ? 0.93f + noise(0.01f) : 0.38f;
+    });
+    check(quality::evalTexture(brighter, m, smooth, m).score > 0.99f,
+          "texture: brighter exposure of the same foam -> same texture");
+
+    const PatternMask tiny = disk(256.f, 256.f, 25.f);
+    check(has(quality::evalTexture(smooth, tiny, smooth, m).feedback, "too small"),
+          "texture: foam smaller than 2000 px -> 'too small' instead of a noisy score");
+
+    check(quality::evalTexture(smooth, PatternMask{}, smooth, m).score == 0.f, "texture: no pattern -> score 0");
+}
+
 }  // namespace
 
 int runQuality(const Args& args) {
     testSizeAndPosition();
+    testContrast();
+    testShape();
+    testTexture();
     std::printf("All quality self-tests passed.\n");
 
     if (args.size() < 2) {

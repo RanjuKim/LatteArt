@@ -10,6 +10,11 @@ float closeness(float user, float ref, float sigma) {
     return std::exp(-std::abs(user - ref) / sigma);
 }
 
+float notWorse(float user, float ref, float sigma, bool higherIsBetter) {
+    const bool atLeastAsGood = higherIsBetter ? user >= ref : user <= ref;
+    return atLeastAsGood ? 1.f : closeness(user, ref, sigma);
+}
+
 QualityResult evaluateQuality(const NormalizedCup& user, const PatternMask& userMask,
                               const NormalizedCup& ref, const PatternMask& refMask,
                               const Weights& w) {
