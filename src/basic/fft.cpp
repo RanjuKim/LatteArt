@@ -9,6 +9,8 @@ namespace la::basic {
 
 namespace {
 
+constexpr double kPi = 3.14159265358979323846;
+
 bool isPowerOfTwo(size_t n) { return n > 0 && (n & (n - 1)) == 0; }
 
 size_t nextPowerOfTwo(size_t n) {
@@ -36,7 +38,7 @@ void fft(std::vector<Complex>& a, bool inverse) {
 
     // Butterflies over blocks of length 2, 4, ..., n.
     for (size_t len = 2; len <= n; len <<= 1) {
-        const double angle = 2.0 * M_PI / static_cast<double>(len) * (inverse ? 1.0 : -1.0);
+        const double angle = 2.0 * kPi / static_cast<double>(len) * (inverse ? 1.0 : -1.0);
         const Complex wLen(std::cos(angle), std::sin(angle));
         for (size_t i = 0; i < n; i += len) {
             Complex w(1.0, 0.0);
@@ -54,11 +56,11 @@ void fft(std::vector<Complex>& a, bool inverse) {
         for (Complex& x : a) x /= static_cast<double>(n);
 }
 
-// Note: the DC term |X[0]| is included. Subtract the mean from the signal
-// first if only the periodic part (e.g. layer spacing) is of interest.
-std::vector<double> magnitudeSpectrum(const std::vector<float>& signal) {
+// See fft.h for how bin k maps to a number of cycles after zero padding.
+std::vector<double> magnitudeSpectrum(const std::vector<float>& signal, size_t* paddedSize) {
     if (signal.empty()) throw std::invalid_argument("magnitudeSpectrum: empty signal");
     const size_t n = nextPowerOfTwo(signal.size());
+    if (paddedSize) *paddedSize = n;
     std::vector<Complex> a(n, Complex(0.0, 0.0));
     for (size_t i = 0; i < signal.size(); ++i) a[i] = Complex(signal[i], 0.0);
     fft(a);

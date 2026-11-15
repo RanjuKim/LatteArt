@@ -80,7 +80,7 @@ ItemScore evalSize(const NormalizedCup& user, const PatternMask& userMask,
     ItemScore it;
     it.raw = coverage(user, userMask);
     it.ref = coverage(ref, refMask);
-    it.score = closeness(it.raw, it.ref, kSizeSigma);
+    it.score = userMask.area > 0.f ? closeness(it.raw, it.ref, kSizeSigma) : 0.f;
 
     if (userMask.area <= 0.f)
         it.feedback = "No pattern detected.";

@@ -22,6 +22,7 @@ void checkInputs(const cv::Mat& src, const cv::Mat& mask, const char* who) {
 }
 
 int toBin(float v) {
+    if (!std::isfinite(v)) throw std::invalid_argument("threshold: image contains NaN or Inf");
     return static_cast<int>(std::clamp(v, 0.f, 1.f) * (kBins - 1) + 0.5f);
 }
 
@@ -65,8 +66,9 @@ float otsuThreshold(const cv::Mat& src, const cv::Mat& mask) {
         }
     }
 
-    // Only one brightness level present: no meaningful split.
-    if (bestT < 0) return static_cast<float>(sumAll / total / (kBins - 1));
+    // Only one brightness level present: there is nothing to split, so return
+    // 1.0 (binarize then selects no pixel, since values are at most 1).
+    if (bestT < 0) return 1.f;
 
     // Bins 0..bestT are background; this value separates bin bestT from bestT+1.
     return (bestT + 0.5f) / (kBins - 1);

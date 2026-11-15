@@ -66,8 +66,17 @@ void testThreshold() {
     // Mask covering only the bright half: one level -> threshold at that level.
     cv::Mat mask = filled(10, 20, CV_8UC1, 0);
     fillRect(mask, 10, 0, 19, 9);
-    check(std::abs(basic::otsuThreshold(img, mask) - 0.8f) < 0.01f, "otsu ignores pixels outside the mask");
+    // Mask covering only the bright half: one level -> nothing to split (1.0).
+    check(basic::otsuThreshold(img, mask) == 1.f, "otsu: single brightness level -> 1.0 (no split)");
+    check(countOn(basic::binarize(img, basic::otsuThreshold(img, mask), mask)) == 0,
+          "otsu: single level selects no pixel");
     check(countOn(basic::binarize(img, 0.5f, mask)) == 100, "binarize is zero outside the mask");
+
+    cv::Mat bad = img.clone();
+    bad.ptr<float>(3)[3] = std::nanf("");
+    bool threw = false;
+    try { basic::otsuThreshold(bad); } catch (const std::invalid_argument&) { threw = true; }
+    check(threw, "otsu rejects NaN pixels");
 }
 
 void testMorphology() {
@@ -128,6 +137,19 @@ void testFft() {
         if (mag[k] > mag[peak]) peak = k;
     check(mag.size() == 33 && peak == 8, "magnitudeSpectrum peaks at the cosine frequency");
 
+    // Non-power-of-two length: 200 samples with 4 cycles, padded to 256.
+    // The peak bin must be converted with cycles = k * 200 / 256 (see fft.h).
+    std::vector<float> prof(200);
+    for (int i = 0; i < 200; ++i) prof[i] = static_cast<float>(std::cos(2.0 * M_PI * 4.0 * i / 200.0));
+    size_t npad = 0;
+    const std::vector<double> m200 = basic::magnitudeSpectrum(prof, &npad);
+    size_t k200 = 1;
+    for (size_t k = 1; k < m200.size(); ++k)
+        if (m200[k] > m200[k200]) k200 = k;
+    const double cycles = double(k200) * prof.size() / double(npad);
+    check(npad == 256 && std::lround(cycles) == 4,
+          "padded spectrum: peak bin converts back to 4 cycles over 200 samples");
+
     const cv::Mat m2 = basic::fft2Magnitude(filled(3, 5, CV_32FC1, 1.0));
     check(m2.rows == 4 && m2.cols == 8 && std::abs(m2.ptr<float>(0)[0] - 15.f) < 1e-4f,
           "fft2Magnitude pads to 4x8, DC = sum of pixels");
@@ -166,6 +188,28 @@ void testSegmentation() {
     check(pm.mask.ptr<uchar>(256)[20] == 0, "nothing outside the cup");
     check(std::abs(pm.centroid.x - 256.5f) < 2.f && pm.centroid.y > 256.f && pm.centroid.y < 290.f,
           "centroid lies between the blobs, closer to the bigger one");
+
+    // Plain crema, no foam: uniform, then with a light-to-dark gradient and
+    // noise (Otsu still splits it, but the bright class is not foam).
+    paint(N / 2, N / 2, 400, 200, 200, 200);
+    paint(N / 2, N / 2, 240, 40, 80, 130);
+    check(structure::segmentPattern(normalize::fromCanonicalImage(bgr)).area == 0.f,
+          "uniform crema without foam -> empty mask");
+    unsigned seed = 12345;
+    for (int y = 0; y < N; ++y)
+        for (int x = 0; x < N; ++x) {
+            const int dx = x - N / 2, dy = y - N / 2;
+            if (dx * dx + dy * dy > 240 * 240) continue;
+            seed = seed * 1103515245u + 12345u;
+            const int noise = static_cast<int>((seed >> 16) % 31) - 15;
+            const int light = 60 - static_cast<int>(std::sqrt(double(dx * dx + dy * dy)) / 4);  // 60 -> 0
+            uchar* p = bgr.ptr<uchar>(y) + 3 * x;
+            p[0] = static_cast<uchar>(std::clamp(40 + light + noise, 0, 255));
+            p[1] = static_cast<uchar>(std::clamp(80 + light + noise, 0, 255));
+            p[2] = static_cast<uchar>(std::clamp(130 + light + noise, 0, 255));
+        }
+    check(structure::segmentPattern(normalize::fromCanonicalImage(bgr)).area == 0.f,
+          "crema with lighting gradient and noise, no foam -> empty mask");
 
     // Cup circle 20 px off: a crescent of the white ceramic rim falls inside
     // the mask. It must be dropped, while a pattern touching the edge stays.

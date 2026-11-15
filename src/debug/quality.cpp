@@ -69,6 +69,11 @@ void testSizeAndPosition() {
 
     const ItemScore none = quality::evalPosition(cup, blob(0.f, c, c), cup, same);
     check(none.score == 0.f, "position: no pattern -> score 0");
+
+    // Even when the reference pattern is tiny (3% of the cup), no pattern = 0.
+    const ItemScore noneSize = quality::evalSize(cup, blob(0.f, c, c), cup, blob(0.03f * cupArea, c, c));
+    check(noneSize.score == 0.f && noneSize.feedback == "No pattern detected.",
+          "size: no pattern -> score 0, even vs a tiny reference");
 }
 
 }  // namespace
