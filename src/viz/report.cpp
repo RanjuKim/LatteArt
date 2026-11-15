@@ -7,28 +7,88 @@
 
 namespace la::viz {
 
-static void printItem(const char* name, const ItemScore& it, int weightPct) {
-    std::printf("  %-9s %3d%%  score %.2f  (you %.3f / ref %.3f)  %s\n", name, weightPct,
-                it.score, it.raw, it.ref, it.feedback.c_str());
-}
+    static void printItem(const char* name, const ItemScore& item,
+        int weightPct) {
+        std::printf(
+            "  %-10s %3d%%    %6.1f / 100    %9.3f    %9.3f\n",
+            name, weightPct, item.score * 100.f,
+            item.raw, item.ref);
 
-void printReport(const PatternSpec& spec, const LayerResult& refLayers,
-                 const LayerResult& userLayers, const QualityResult& q, const ScoreResult& s) {
-    std::printf("\n===== Latte Art Score =====\n");
-    std::printf("Target   : %s, %d layers\n", spec.name.c_str(), spec.targetLayers);
-    std::printf("Layers   : reference %d, yours %d  (error %d)%s\n", refLayers.count,
-                userLayers.count, s.deltaN, s.needsReview ? "  [UNCERTAIN - review]" : "");
-    std::printf("Band     : %.0f - %.0f\n", s.bandLow, s.bandHigh);
-    std::printf("Uniform U: %.2f  (spacing CV %.2f, thickness CV %.2f)\n", s.U,
-                userLayers.spacingCV, userLayers.thicknessCV);
-    std::printf("Quality Q: %.2f\n", s.Q);
-    printItem("contrast", q.contrast, 30);
-    printItem("shape", q.shape, 25);
-    printItem("texture", q.texture, 20);
-    printItem("position", q.position, 15);
-    printItem("size", q.size, 10);
-    std::printf("FINAL    : %.1f / 100\n", s.finalScore);
-}
+        if (!item.feedback.empty()) {
+            std::printf("    Feedback: %s\n", item.feedback.c_str());
+        }
+    }
+
+    void printReport(const PatternSpec& spec,
+        const LayerResult& refLayers,
+        const LayerResult& userLayers,
+        const QualityResult& q,
+        const ScoreResult& s) {
+        // Display supplied results only.
+        // Layer analysis and score calculation belong to other modules.
+        const bool needsReview =
+            s.needsReview || refLayers.uncertain || userLayers.uncertain;
+
+        std::printf("\n");
+        std::printf("============================================================\n");
+        std::printf("                    LATTE ART REPORT\n");
+        std::printf("============================================================\n");
+
+        std::printf("Target pattern   : %s\n", spec.name.c_str());
+        std::printf("Target layers    : %d\n", spec.targetLayers);
+        std::printf("Reference layers : %d\n", refLayers.count);
+        std::printf("Your layers      : %d\n", userLayers.count);
+        std::printf("Layer error      : %d\n", s.deltaN);
+
+        if (needsReview) {
+            std::printf("Status           : UNCERTAIN - manual review required\n");
+
+            if (refLayers.uncertain) {
+                std::printf(
+                    "  Reference: peak count %d, FFT count %d\n",
+                    refLayers.count, refLayers.fftCount);
+            }
+
+            if (userLayers.uncertain) {
+                std::printf(
+                    "  Yours    : peak count %d, FFT count %d\n",
+                    userLayers.count, userLayers.fftCount);
+            }
+        }
+        else {
+            std::printf("Status           : No uncertainty flag reported\n");
+        }
+
+        std::printf("\n");
+        std::printf("------------------------------------------------------------\n");
+        std::printf("SCORE SUMMARY\n");
+        std::printf("------------------------------------------------------------\n");
+        std::printf("Score band       : %.0f - %.0f\n",
+            s.bandLow, s.bandHigh);
+        std::printf("Uniformity U     : %.3f / 1.000\n", s.U);
+        std::printf("  Spacing CV     : %.3f\n", userLayers.spacingCV);
+        std::printf("  Thickness CV   : %.3f\n", userLayers.thicknessCV);
+        std::printf("Quality Q        : %.3f / 1.000\n", s.Q);
+
+        std::printf("\n");
+        std::printf("------------------------------------------------------------\n");
+        std::printf("QUALITY DETAILS\n");
+        std::printf("------------------------------------------------------------\n");
+        std::printf(
+            "  Item       Weight      Score          You          Ref\n");
+
+        printItem("Contrast", q.contrast, 30);
+        printItem("Shape", q.shape, 25);
+        printItem("Texture", q.texture, 20);
+        printItem("Position", q.position, 15);
+        printItem("Size", q.size, 10);
+
+        std::printf("\n");
+        std::printf("============================================================\n");
+        std::printf("FINAL SCORE      : %.1f / 100%s\n",
+            s.finalScore, needsReview ? "  [REVIEW REQUIRED]" : "");
+        std::printf("============================================================\n");
+    }
 
 cv::Mat renderResult(const NormalizedCup& ref, const PatternMask& refMask,
                      const LayerResult& refLayers, const NormalizedCup& user,
