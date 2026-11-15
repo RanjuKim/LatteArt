@@ -18,6 +18,10 @@ struct Weights {  // draft, tune against human ratings
 // Similarity of a user value to the reference value: exp(-|u - r| / sigma).
 float closeness(float user, float ref, float sigma);
 
+// One-sided version: no deduction when the user is at least as good as the
+// reference (e.g. sharper edges than the expert), otherwise closeness().
+float notWorse(float user, float ref, float sigma, bool higherIsBetter);
+
 // Michelson contrast, edge width, high-frequency ratio.
 ItemScore evalContrast(const NormalizedCup& user, const PatternMask& userMask,
                        const NormalizedCup& ref, const PatternMask& refMask);
