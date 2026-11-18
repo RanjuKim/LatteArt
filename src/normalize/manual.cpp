@@ -8,17 +8,20 @@
 
 namespace la::normalize {
 
-cv::Mat canonicalCrop(const cv::Mat& bgr, float cx, float cy, float r) {
-    if (bgr.type() != CV_8UC3) throw std::invalid_argument("canonicalCrop: expected CV_8UC3");
-    if (r <= 0.f) throw std::invalid_argument("canonicalCrop: radius must be positive");
+cv::Mat canonicalCrop(const cv::Mat &bgr, float cx, float cy, float r) {
+    if (bgr.type() != CV_8UC3)
+        throw std::invalid_argument("canonicalCrop: expected CV_8UC3");
+    if (bgr.empty() || !std::isfinite(cx) || !std::isfinite(cy) || !std::isfinite(r) || r <= 0.f)
+        throw std::invalid_argument(
+            "canonicalCrop: non-empty image, finite center and positive radius required");
 
     const int N = kCanonicalSize;
     const float c = N / 2.f;
-    const float s = r / kCanonicalRadius;  // source pixels per output pixel
+    const float s = r / kCanonicalRadius; // source pixels per output pixel
     cv::Mat out(N, N, CV_8UC3);
 
     for (int v = 0; v < N; ++v) {
-        uchar* d = out.ptr<uchar>(v);
+        uchar *d = out.ptr<uchar>(v);
         for (int u = 0; u < N; ++u) {
             const float x = cx + (u - c) * s;
             const float y = cy + (v - c) * s;
@@ -29,8 +32,8 @@ cv::Mat canonicalCrop(const cv::Mat& bgr, float cx, float cy, float r) {
                 continue;
             }
             const float fx = x - x0, fy = y - y0;
-            const uchar* p0 = bgr.ptr<uchar>(y0) + 3 * x0;
-            const uchar* p1 = bgr.ptr<uchar>(y0 + 1) + 3 * x0;
+            const uchar *p0 = bgr.ptr<uchar>(y0) + 3 * x0;
+            const uchar *p1 = bgr.ptr<uchar>(y0 + 1) + 3 * x0;
             for (int ch = 0; ch < 3; ++ch) {
                 const float top = p0[ch] * (1 - fx) + p0[3 + ch] * fx;
                 const float bot = p1[ch] * (1 - fx) + p1[3 + ch] * fx;
@@ -41,7 +44,7 @@ cv::Mat canonicalCrop(const cv::Mat& bgr, float cx, float cy, float r) {
     return out;
 }
 
-NormalizedCup fromCanonicalImage(const cv::Mat& bgr512) {
+NormalizedCup fromCanonicalImage(const cv::Mat &bgr512) {
     if (bgr512.type() != CV_8UC3 || bgr512.rows != kCanonicalSize || bgr512.cols != kCanonicalSize)
         throw std::invalid_argument("fromCanonicalImage: expected 512x512 CV_8UC3 (use --canon)");
 
@@ -50,14 +53,14 @@ NormalizedCup fromCanonicalImage(const cv::Mat& bgr512) {
     cup.gray = basic::bgrToGray(bgr512);
     try {
         basic::bgrToLab(bgr512, cup.L, cup.a, cup.b);
-    } catch (const std::logic_error&) {
+    } catch (const std::logic_error &) {
         // bgrToLab not implemented yet: leave L/a/b empty.
     }
 
     cup.cupMask = cv::Mat(kCanonicalSize, kCanonicalSize, CV_8UC1);
     const float r2 = kCanonicalRadius * kCanonicalRadius;
     for (int y = 0; y < kCanonicalSize; ++y) {
-        uchar* m = cup.cupMask.ptr<uchar>(y);
+        uchar *m = cup.cupMask.ptr<uchar>(y);
         for (int x = 0; x < kCanonicalSize; ++x) {
             const float dx = x + 0.5f - cup.center.x, dy = y + 0.5f - cup.center.y;
             m[x] = (dx * dx + dy * dy <= r2) ? 255 : 0;
@@ -67,4 +70,4 @@ NormalizedCup fromCanonicalImage(const cv::Mat& bgr512) {
     return cup;
 }
 
-}  // namespace la::normalize
+} // namespace la::normalize

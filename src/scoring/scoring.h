@@ -4,6 +4,7 @@
 //   dn = 0 -> 60..100,  dn = 1 -> 30..59,  dn >= 2 -> 0..29
 #pragma once
 #include "core/types.h"
+#include "structure/layers.h"
 
 namespace la::scoring {
 
@@ -13,6 +14,10 @@ struct Band {
 
 Band bandFor(int deltaN);
 
-ScoreResult computeScore(const LayerResult& layers, int targetLayers, float Q);
+ScoreResult computeScore(const LayerResult &layers, int targetLayers, float Q);
 
-}  // namespace la::scoring
+// Mean of per-line banded scores. Q is measured once on the original-size cups.
+// deltaN=-1 explicitly means no single image-level count error is defined.
+ScoreResult computeScore(const structure::StructureComparison &structure, float Q);
+
+} // namespace la::scoring
