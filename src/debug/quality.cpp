@@ -10,6 +10,8 @@
 #include <functional>
 #include <stdexcept>
 #include <string>
+#include <tuple>
+#include <vector>
 
 #include "basic/filter.h"
 #include "debug/debug.h"
@@ -179,6 +181,109 @@ void testContrast() {
           "contrast: foam darker than crema -> not measurable, score 0");
 }
 
+// Five overlapping disks (radius 30, 40 px apart) along an axis through the
+// cup center, tilted `deg` clockwise; `bend` pushes the middle disks sideways
+// in a C shape with zero mean (so the centroid stays centered).
+PatternMask diskStack(float deg, float bend = 0.f) {
+    const float a = deg * 3.14159265f / 180.f;
+    std::vector<cv::Point2f> centers;
+    for (int i = -2; i <= 2; ++i) {
+        const float t = 40.f * i;
+        const float side = bend * ((i * i) / 4.f - 0.4f);  // mean over i = -2..2 is 0
+        centers.push_back({256.f + t * std::sin(a) + side * std::cos(a),
+                           256.f - t * std::cos(a) + side * std::sin(a)});
+    }
+    return maskFrom([centers](int x, int y) {
+        for (const auto& c : centers)
+            if (inDisk(x, y, c.x, c.y, 30.f)) return true;
+        return false;
+    });
+}
+
+// Downward triangle (heart tip without the lobes), rotated `deg` clockwise
+// about the cup center.
+PatternMask triangle(float deg) {
+    const float a = deg * 3.14159265f / 180.f, ca = std::cos(a), sa = std::sin(a);
+    return maskFrom([=](int x, int y) {
+        // rotate the pixel back by -deg, then test the upright triangle
+        const float px = x + 0.5f - 256.f, py = y + 0.5f - 256.f;
+        const float ux = px * ca + py * sa + 256.f, uy = -px * sa + py * ca + 256.f;
+        const float t = (uy - 160.f) / 200.f;
+        return t >= 0.f && t <= 1.f && std::abs(ux - 256.f) <= 110.f * (1.f - t);
+    });
+}
+
+// Shapes WIDER than tall, rotated `deg` clockwise about the cup center: these
+// broke a midline measured across a fixed vertical axis (review finding).
+PatternMask rotatedShape(float deg, const std::function<bool(float ux, float uy)>& upright) {
+    const float a = deg * 3.14159265f / 180.f, ca = std::cos(a), sa = std::sin(a);
+    return maskFrom([=](int x, int y) {
+        const float px = x + 0.5f - 256.f, py = y + 0.5f - 256.f;
+        return upright(px * ca + py * sa, -px * sa + py * ca);  // coordinates relative to center
+    });
+}
+
+PatternMask wideEllipse(float deg) {
+    return rotatedShape(deg, [](float ux, float uy) { return (ux * ux) / (70.f * 70.f) + (uy * uy) / (50.f * 50.f) <= 1.f; });
+}
+
+// Heart: two round lobes on top, a triangular tip below, a crema hole inside.
+PatternMask heart(float deg) {
+    return rotatedShape(deg, [](float ux, float uy) {
+        auto in = [](float x, float y, float cx, float cy, float r) {
+            return (x - cx) * (x - cx) + (y - cy) * (y - cy) <= r * r;
+        };
+        const bool lobes = in(ux, uy, -50.f, -50.f, 60.f) || in(ux, uy, 50.f, -50.f, 60.f);
+        const float t = (uy + 50.f) / 160.f;  // 0 at the lobe centers, 1 at the tip
+        const bool tip = t >= 0.f && t <= 1.f && std::abs(ux) <= 108.f * (1.f - t);
+        const bool hole = in(ux, uy, 0.f, -10.f, 18.f);
+        return (lobes || tip) && !hole;
+    });
+}
+
+void testAxisTools() {
+    const PatternMask round = disk(256.f, 256.f, 100.f);
+    check(quality::mirrorIoU(round.mask, quality::AxisLine{round.centroid, 0.f}) > 0.98f,
+          "axis: disk is symmetric about the vertical");
+
+    const PatternMask tilted = triangle(12.f);
+    const quality::AxisLine found = quality::findSymmetryAxis(tilted.mask, 0.f, 20.f);
+    std::printf("       (triangle rotated 12 deg: axis found at %.1f deg, mirror IoU %.3f)\n",
+                found.angleDeg, quality::mirrorIoU(tilted.mask, found));
+    check(std::abs(found.angleDeg - 12.f) < 1.5f && quality::mirrorIoU(tilted.mask, found) > 0.95f,
+          "axis: finds the 12-degree symmetry axis of a rotated triangle");
+
+    // Intended use: find the pattern's own axis, then measure along it.
+    auto lean = [](const PatternMask& pm, float& leanDeg) {
+        const quality::AxisLine ax = quality::findSymmetryAxis(pm.mask, 0.f, 20.f);
+        const quality::AxisShape s = quality::measureAxis(pm.mask, ax);
+        leanDeg = ax.angleDeg + s.tiltDeg;
+        return s;
+    };
+    float deg = 0.f;
+    const quality::AxisShape right = lean(diskStack(15.f), deg);
+    std::printf("       (stack tilted 15 deg: lean %.1f deg, bend %.2f px)\n", deg, right.bendPx);
+    check(right.valid && std::abs(deg - 15.f) < 1.f && right.bendPx < 1.f,
+          "axis: measures a 15-degree lean (top to the right = positive)");
+
+    const quality::AxisShape left = lean(diskStack(-10.f), deg);
+    check(left.valid && std::abs(deg + 10.f) < 1.f, "axis: a lean to the left is negative");
+
+    const quality::AxisShape wide = lean(heart(10.f), deg);
+    std::printf("       (heart rotated 10 deg: lean %.1f deg, bend %.2f px)\n", deg, wide.bendPx);
+    check(wide.valid && std::abs(deg - 10.f) < 1.f && wide.bendPx < 2.f,
+          "axis: a wide heart rotated 10 deg -> lean 10, no bend (review finding)");
+
+    const quality::AxisShape curved =
+        quality::measureAxis(diskStack(0.f, 40.f).mask, quality::AxisLine{{256.f, 256.f}, 0.f});
+    std::printf("       (C-shaped stack: tilt %.1f deg, bend %.2f px)\n", curved.tiltDeg, curved.bendPx);
+    check(curved.valid && std::abs(curved.tiltDeg) < 2.f && curved.bendPx > 8.f,
+          "axis: a C-shaped (bent) axis shows bend but no tilt");
+
+    check(!quality::measureAxis(disk(256.f, 256.f, 3.f).mask, quality::AxisLine{{256.f, 256.f}, 0.f}).valid,
+          "axis: too small a pattern is not measurable");
+}
+
 void testShape() {
     const PatternMask ref = disk(256.f, 256.f, 100.f);
     const ItemScore same = quality::evalShape(ref, ref);
@@ -207,6 +312,12 @@ void testShape() {
     check(other.score < scaled.score - 0.1f, "shape: triangle vs disk scores clearly lower than a scaled disk");
 
     check(quality::evalShape(PatternMask{}, ref).score == 0.f, "shape: no pattern -> score 0");
+
+    // A symmetric pattern that is tilted a little keeps its symmetry score
+    // (the tilt is judged by the position item, not as asymmetry).
+    const ItemScore tiltedTri = quality::evalShape(triangle(12.f), triangle(0.f));
+    check(tiltedTri.raw > 0.95f && !has(tiltedTri.feedback, "less symmetric"),
+          "shape: a 12-degree tilted symmetric pattern is still symmetric");
 
     PatternMask broken = maskFrom([](int, int) { return false; });
     broken.area = 500.f;  // inconsistent: area says 500 px, mask is empty
@@ -277,10 +388,48 @@ void testTexture() {
     check(quality::evalTexture(smooth, PatternMask{}, smooth, m).score == 0.f, "texture: no pattern -> score 0");
 }
 
+
+void testPositionAxis() {
+    const NormalizedCup cup;
+    const PatternMask straight = diskStack(0.f);
+    check(quality::evalPosition(cup, straight, cup, straight).score > 0.99f,
+          "position: identical straight axis -> score 1");
+
+    const ItemScore lean = quality::evalPosition(cup, diskStack(15.f), cup, straight);
+    std::printf("       (leaning stack: %s)\n", lean.feedback.c_str());
+    check(lean.score < 0.95f && has(lean.feedback, "leans 15.0 degrees to the right"),
+          "position: 15-degree lean -> 'leans 15.0 degrees to the right'");
+
+    const ItemScore bent = quality::evalPosition(cup, diskStack(0.f, 40.f), cup, straight);
+    std::printf("       (bent stack: %s)\n", bent.feedback.c_str());
+    check(bent.score < 0.95f && has(bent.feedback, "axis is bent"), "position: C-shaped axis -> 'axis is bent'");
+
+    // The reference leans too: matching its lean is not penalized more.
+    check(quality::evalPosition(cup, diskStack(8.f), cup, diskStack(8.f)).score > 0.99f,
+          "position: same lean as the reference -> no deduction");
+
+    // Wide shapes rotated 10 degrees: a straight axis that leans 10 degrees,
+    // NOT a bent axis and NOT a lean to the left (review finding).
+    for (const auto& [name, user, upright] :
+         {std::tuple<const char*, PatternMask, PatternMask>{"heart", heart(10.f), heart(0.f)},
+          std::tuple<const char*, PatternMask, PatternMask>{"wide ellipse", wideEllipse(10.f), wideEllipse(0.f)}}) {
+        const ItemScore it = quality::evalPosition(cup, user, cup, upright);
+        std::printf("       (%s rotated 10 deg: %s)\n", name, it.feedback.c_str());
+        const size_t at = it.feedback.find("leans ");
+        const float shown = at == std::string::npos ? -1.f : std::stof(it.feedback.substr(at + 6));
+        check(std::abs(shown - 10.f) < 1.f && has(it.feedback, "right") && !has(it.feedback, "bent"),
+              std::string("position: ") + name + " rotated 10 deg -> leans ~10 deg right, not bent");
+        check(quality::evalPosition(cup, upright, cup, upright).score > 0.99f,
+              std::string("position: upright ") + name + " vs itself -> score 1");
+    }
+}
+
 }  // namespace
 
 int runQuality(const Args& args) {
     testSizeAndPosition();
+    testAxisTools();
+    testPositionAxis();
     testContrast();
     testShape();
     testTexture();
