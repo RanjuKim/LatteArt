@@ -3,9 +3,10 @@
 //   1. overlap: scale and shift the user pattern to the reference's area and
 //      centroid, overlay the two masks and take IoU (proposal: "align the
 //      size and position of the two patterns, overlay them")
-//   2. symmetry: IoU of the pattern with its left-right mirror image about the
-//      vertical line through its centroid (axis is vertical after
-//      normalization); only less symmetry than the reference is penalized
+//   2. symmetry: IoU of the pattern with its mirror image about its own axis
+//      (best line through the centroid within +-20 deg of vertical, see
+//      findSymmetryAxis); only less symmetry than the reference is penalized.
+//      For a pattern with several axes, call mirrorIoU once per axis part.
 //   3. Hu moment distance (Hu 1962): size/position/rotation-invariant shape
 //      descriptors, compared on a log scale
 #include <algorithm>
@@ -24,6 +25,7 @@ namespace {
 constexpr float kSymmetrySigma = 0.10f;
 constexpr float kHuSigma = 0.5f;
 constexpr int kHuUsed = 4;   // invariants 5-7 are tiny and noisy for blob shapes
+constexpr float kAxisSearchDeg = 20.f;  // mirror line searched within +-20 deg of vertical
 constexpr float kOk = 0.85f;
 
 struct Moments {
@@ -56,17 +58,12 @@ double iou(const cv::Mat& a, const cv::Mat& b) {
     return uni > 0 ? inter / uni : 0.0;
 }
 
-// Left-right mirror about x = cx (pixel centers at x + 0.5).
-float mirrorIoU(const cv::Mat& mask) {
-    const Moments m = centroidOf(mask);
-    if (m.area <= 0) return 0.f;
-    cv::Mat mir(mask.rows, mask.cols, CV_8UC1);
-    for (int y = 0; y < mask.rows; ++y)
-        for (int x = 0; x < mask.cols; ++x) {
-            const int sx = static_cast<int>(std::floor(2.0 * m.cx - (x + 0.5)));
-            mir.ptr<uchar>(y)[x] = at(mask, sx, y) ? 255 : 0;
-        }
-    return static_cast<float>(iou(mask, mir));
+// Symmetry about the pattern's own axis: the best mirror line within
+// +-kAxisSearchDeg of vertical (the axis normalization puts upright). A
+// pattern that is symmetric but a few degrees tilted keeps full symmetry;
+// the tilt itself is judged by the position item.
+float symmetry(const cv::Mat& mask) {
+    return mirrorIoU(mask, findSymmetryAxis(mask, 0.f, kAxisSearchDeg));
 }
 
 // User mask scaled (by sqrt of the area ratio) and shifted onto the reference
@@ -158,7 +155,7 @@ ItemScore evalShape(const PatternMask& userMask, const PatternMask& refMask) {
         return it;
     }
 
-    const float symU = mirrorIoU(userMask.mask), symR = mirrorIoU(refMask.mask);
+    const float symU = symmetry(userMask.mask), symR = symmetry(refMask.mask);
     const float overlap = alignedIoU(userMask.mask, refMask.mask);
     const float hu = huDistance(userMask.mask, refMask.mask);
     it.raw = symU;
