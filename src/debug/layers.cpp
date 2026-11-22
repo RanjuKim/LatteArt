@@ -170,7 +170,7 @@ int selfTest() {
     check(final.finalScore > 99.9f,
           "multi-line final score without invented global count");
     auto lower = scoring::computeScore(s, 0);
-    check(std::abs(lower.finalScore - 80) < .01f, "band floor and 50/50 structure-quality weighting");
+    check(std::abs(lower.finalScore - 72) < .01f, "band floor and 30/70 structure-quality weighting");
     auto shifted = fixture(1, 1, 17, -9);
     auto ss = structure::compareAtAngle(f.cup, f.mask, shifted.cup, shifted.mask, 0, p);
     check(ss.alignmentScore > 99.9f && ss.sizeOk,

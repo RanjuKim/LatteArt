@@ -7,7 +7,7 @@
 
 namespace la::scoring {
 
-constexpr float kStructureWeight = 0.5f;
+constexpr float kStructureWeight = 0.3f;
 
 struct Band {
     float low, high;
