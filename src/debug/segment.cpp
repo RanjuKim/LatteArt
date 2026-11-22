@@ -208,8 +208,59 @@ void testSegmentation() {
             p[1] = static_cast<uchar>(std::clamp(80 + light + noise, 0, 255));
             p[2] = static_cast<uchar>(std::clamp(130 + light + noise, 0, 255));
         }
-    check(structure::segmentPattern(normalize::fromCanonicalImage(bgr)).area == 0.f,
+    structure::FoamEvidence ev;
+    check(structure::segmentPattern(normalize::fromCanonicalImage(bgr), &ev).area == 0.f,
           "crema with lighting gradient and noise, no foam -> empty mask");
+    std::printf("       (gradient: Michelson %.3f, edge %.1f px, chroma ratio %.2f)\n", ev.michelson,
+                ev.edgeWidth, ev.chromaRatio);
+
+    // Smooth whitish glare on crema (no noise): the bright side is paler, so
+    // the color check alone would pass it, but the change is spread over many
+    // pixels, not an edge.
+    for (int y = 0; y < N; ++y)
+        for (int x = 0; x < N; ++x) {
+            const int dx = x - N / 2, dy = y - N / 2;
+            if (dx * dx + dy * dy > 240 * 240) continue;
+            const int light = 60 - static_cast<int>(std::sqrt(double(dx * dx + dy * dy)) / 4);  // 60 -> 0
+            uchar* p = bgr.ptr<uchar>(y) + 3 * x;
+            p[0] = static_cast<uchar>(std::clamp(40 + 2 * light, 0, 255));  // blue rises most -> whiter
+            p[1] = static_cast<uchar>(std::clamp(80 + 3 * light / 2, 0, 255));
+            p[2] = static_cast<uchar>(std::clamp(130 + light, 0, 255));
+        }
+    check(structure::segmentPattern(normalize::fromCanonicalImage(bgr), &ev).area == 0.f,
+          "smooth whitish glare without an edge -> empty mask");
+    std::printf("       (glare: Michelson %.3f, edge %.1f px, chroma ratio %.2f)\n", ev.michelson,
+                ev.edgeWidth, ev.chromaRatio);
+
+    // Real photos the old rule (foam gray >= 0.55, foam - crema >= 0.15) rejected.
+    // Light crema (milky latte): foam only ~0.15 brighter than the crema.
+    paint(N / 2, N / 2, 400, 200, 200, 200);
+    paint(N / 2, N / 2, 240, 165, 195, 215);  // light tan crema, gray ~0.78
+    paint(256, 256, 90, 225, 235, 240);       // foam, gray ~0.92
+    const PatternMask light = structure::segmentPattern(normalize::fromCanonicalImage(bgr), &ev);
+    std::printf("       (light crema: Michelson %.3f, edge %.1f px, chroma ratio %.2f)\n", ev.michelson,
+                ev.edgeWidth, ev.chromaRatio);
+    check(ev.hasFoam && light.mask.ptr<uchar>(256)[256] == 255 && light.mask.ptr<uchar>(256)[400] == 0,
+          "foam on light crema (difference < 0.15) is found");
+
+    // Dark, under-exposed photo: the foam itself is only ~0.45 gray.
+    paint(N / 2, N / 2, 400, 60, 60, 60);
+    paint(N / 2, N / 2, 240, 20, 40, 65);     // dark crema, gray ~0.15
+    paint(256, 256, 90, 110, 115, 120);       // foam, gray ~0.45
+    const PatternMask dark = structure::segmentPattern(normalize::fromCanonicalImage(bgr), &ev);
+    std::printf("       (dark photo: foam gray %.2f, Michelson %.3f, edge %.1f px)\n", ev.foam,
+                ev.michelson, ev.edgeWidth);
+    check(ev.hasFoam && dark.mask.ptr<uchar>(256)[256] == 255, "foam in a dark photo (gray < 0.55) is found");
+
+    // Golden crema with dark spots and no milk: the bright class is MORE
+    // saturated than the dark one, so it is crema, not foam.
+    paint(N / 2, N / 2, 400, 200, 200, 200);
+    paint(N / 2, N / 2, 240, 40, 120, 190);   // golden crema
+    for (int i = 0; i < 6; ++i) paint(150 + 40 * i, 200 + 25 * (i % 3), 18, 20, 35, 60);  // dark spots
+    const PatternMask spots = structure::segmentPattern(normalize::fromCanonicalImage(bgr), &ev);
+    std::printf("       (golden crema with dark spots: Michelson %.3f, chroma ratio %.2f)\n", ev.michelson,
+                ev.chromaRatio);
+    check(spots.area == 0.f && ev.chromaRatio > 1.f, "golden crema around dark spots is not foam");
 
     // Cup circle 20 px off: a crescent of the white ceramic rim falls inside
     // the mask. It must be dropped, while a pattern touching the edge stays.
@@ -237,7 +288,10 @@ int runSegment(const Args& args) {
         return 0;
     }
     const NormalizedCup cup = normalize::fromCanonicalImage(io::loadColor(args[0]));
-    const PatternMask pm = structure::segmentPattern(cup);
+    structure::FoamEvidence ev;
+    const PatternMask pm = structure::segmentPattern(cup, &ev);
+    std::printf("foam check: foam %.2f, crema %.2f, Michelson %.3f, edge %.1f px, chroma ratio %.2f -> %s\n",
+                ev.foam, ev.crema, ev.michelson, ev.edgeWidth, ev.chromaRatio, ev.hasFoam ? "foam" : "NO FOAM");
     io::save("debug_segment_mask.png", pm.mask);
 
     cv::Mat overlay = cup.bgr.clone();

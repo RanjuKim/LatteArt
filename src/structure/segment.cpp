@@ -1,6 +1,9 @@
 // Owner: Ranju Kim
 #include "structure/segment.h"
 
+#include <algorithm>
+#include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <vector>
 
@@ -22,11 +25,23 @@ constexpr float kRimShare = 0.6f;       // blob with > 60% of its pixels in the 
 
 // "Is there any foam at all?" Otsu always splits the cup in two, even a cup
 // of plain crema (light and dark crema). The bright class only counts as milk
-// foam if it is bright enough and clearly brighter than the dark class.
-// Draft values on the 0..1 gray scale: foam is usually ~0.75-0.95, crema
-// ~0.2-0.5. Re-check both with real photos.
-constexpr float kMinFoamGray = 0.55f;
-constexpr float kMinFoamContrast = 0.15f;
+// foam if it is
+//   1. brighter than the dark class: Michelson >= kMinMichelson,
+//   2. whiter (less saturated) than it: chroma ratio <= kMaxChromaRatio.
+//      Brighter crema (lighting, golden crema around dark spots) keeps its
+//      brown color, white milk does not; this is the main check.
+//   3. separated by an edge, not a slow lighting change: edge width <= kMaxEdgeWidth.
+// The old rule (foam gray >= 0.55 and foam - crema >= 0.15) rejected 4 of 31
+// real photos: light crema (Pro_Tulip_2, Michelson ~0.10) and a dark photo
+// (Heart_Practice_20, foam gray ~0.45). Measured on those 31 photos (Nov 22):
+// Michelson 0.093-0.280, chroma ratio 0.16-0.83, edge width 5.1-13.6 px
+// (blurry photos are the widest). Noisy lighting gradient on plain crema
+// (self-test): Michelson 0.11, chroma ratio 0.95, edge width 13.7 px, so the
+// edge width alone cannot tell it from a blurry photo; the color can.
+constexpr float kMinMichelson = 0.06f;
+constexpr float kMaxChromaRatio = 0.9f;
+constexpr float kMaxEdgeWidth = 16.f;
+constexpr int kEdgeKeepOut = 3;  // px: boundary this close to the inner cup edge is the cup cut
 
 // Mean of `img` over the pixels where `sel` != 0 (and `inside` != 0).
 // Returns -1 if no pixel is selected.
@@ -43,6 +58,74 @@ float meanWhere(const cv::Mat& img, const cv::Mat& inside, const cv::Mat& sel, b
         }
     }
     return n > 0 ? static_cast<float>(sum / n) : -1.f;
+}
+
+// Mean steepest gradient around the boundary of the bright class, turned into
+// a width: how many px the brightness needs to climb `step`. Boundary pixels
+// next to the inner cup edge are skipped (there the class is cut by the mask,
+// not by the image). Returns +inf when there is no usable boundary.
+float edgeWidthPx(const cv::Mat& blurred, const cv::Mat& bin, const cv::Mat& inner, float step) {
+    const int rows = blurred.rows, cols = blurred.cols;
+    cv::Mat grad(rows, cols, CV_32FC1);
+    for (int y = 0; y < rows; ++y) {
+        float* d = grad.ptr<float>(y);
+        const int yu = std::max(y - 1, 0), yd = std::min(y + 1, rows - 1);
+        for (int x = 0; x < cols; ++x) {
+            const int xl = std::max(x - 1, 0), xr = std::min(x + 1, cols - 1);
+            const float gx = (blurred.ptr<float>(y)[xr] - blurred.ptr<float>(y)[xl]) / float(std::max(xr - xl, 1));
+            const float gy = (blurred.ptr<float>(yd)[x] - blurred.ptr<float>(yu)[x]) / float(std::max(yd - yu, 1));
+            d[x] = std::sqrt(gx * gx + gy * gy);
+        }
+    }
+
+    const cv::Mat usable = basic::erode(inner, kEdgeKeepOut);
+    double sum = 0.0, n = 0.0;
+    for (int y = 1; y < rows - 1; ++y)
+        for (int x = 1; x < cols - 1; ++x) {
+            if (!bin.ptr<uchar>(y)[x] || !usable.ptr<uchar>(y)[x]) continue;
+            const bool boundary = !bin.ptr<uchar>(y - 1)[x] || !bin.ptr<uchar>(y + 1)[x] ||
+                                  !bin.ptr<uchar>(y)[x - 1] || !bin.ptr<uchar>(y)[x + 1];
+            if (!boundary) continue;
+            float best = 0.f;
+            for (int dy = -2; dy <= 2; ++dy)
+                for (int dx = -2; dx <= 2; ++dx) {
+                    const int sx = x + dx, sy = y + dy;
+                    if (sx >= 0 && sy >= 0 && sx < cols && sy < rows) best = std::max(best, grad.ptr<float>(sy)[sx]);
+                }
+            sum += best;
+            n += 1.0;
+        }
+    const double slope = n > 0 ? sum / n : 0.0;
+    return slope > 1e-9 ? static_cast<float>(step / slope) : std::numeric_limits<float>::infinity();
+}
+
+// The three foam checks (see the constants above) on the raw Otsu split.
+FoamEvidence measureFoam(const NormalizedCup& cup, const cv::Mat& blurred, const cv::Mat& inner,
+                         const cv::Mat& bin) {
+    FoamEvidence ev;
+    ev.foam = meanWhere(blurred, inner, bin, true);
+    ev.crema = meanWhere(blurred, inner, bin, false);
+    if (ev.foam < 0.f || ev.crema < 0.f || ev.foam <= ev.crema) return ev;  // no split / not brighter
+
+    ev.michelson = (ev.foam - ev.crema) / (ev.foam + ev.crema);
+    ev.edgeWidth = edgeWidthPx(blurred, bin, inner, ev.foam - ev.crema);
+
+    // Without Lab the color check cannot run; it then passes (ratio 0) and
+    // only the brightness checks decide.
+    if (!cup.a.empty() && !cup.b.empty()) {
+        cv::Mat chroma(cup.a.rows, cup.a.cols, CV_32FC1);
+        for (int y = 0; y < chroma.rows; ++y)
+            for (int x = 0; x < chroma.cols; ++x) {
+                const float a = cup.a.ptr<float>(y)[x], b = cup.b.ptr<float>(y)[x];
+                chroma.ptr<float>(y)[x] = std::sqrt(a * a + b * b);
+            }
+        const float cf = meanWhere(chroma, inner, bin, true), cc = meanWhere(chroma, inner, bin, false);
+        ev.chromaRatio = cc > 1e-6f ? cf / cc : (cf > 1e-6f ? std::numeric_limits<float>::infinity() : 0.f);
+    }
+
+    ev.hasFoam = ev.michelson >= kMinMichelson && ev.chromaRatio <= kMaxChromaRatio &&
+                 ev.edgeWidth <= kMaxEdgeWidth;
+    return ev;
 }
 
 // If the cup circle is a few pixels off, part of the white ceramic rim falls
@@ -83,7 +166,7 @@ cv::Mat removeRimBlobs(const cv::Mat& bin, const NormalizedCup& cup) {
 // Otsu split computed only inside the cup. Separate blobs (e.g. the layers of
 // a tulip) are all kept; only tiny specks are dropped. A cup without foam
 // gives an empty mask (area 0, centroid = cup center).
-PatternMask segmentPattern(const NormalizedCup& cup) {
+PatternMask segmentPattern(const NormalizedCup& cup, FoamEvidence* evidence) {
     if (cup.gray.empty() || cup.cupMask.empty())
         throw std::invalid_argument("segmentPattern: cup.gray and cup.cupMask are required");
 
@@ -93,10 +176,9 @@ PatternMask segmentPattern(const NormalizedCup& cup) {
     const float t = basic::otsuThreshold(blurred, inner);
     cv::Mat bin = basic::binarize(blurred, t, inner);
 
-    const float foam = meanWhere(blurred, inner, bin, true);
-    const float crema = meanWhere(blurred, inner, bin, false);
-    const bool hasFoam = foam >= kMinFoamGray && crema >= 0.f && foam - crema >= kMinFoamContrast;
-    if (!hasFoam) {
+    const FoamEvidence ev = measureFoam(cup, blurred, inner, bin);
+    if (evidence) *evidence = ev;
+    if (!ev.hasFoam) {
         PatternMask none;
         none.mask = cv::Mat(cup.gray.rows, cup.gray.cols, CV_8UC1);
         for (int y = 0; y < none.mask.rows; ++y)
