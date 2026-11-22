@@ -49,8 +49,42 @@ struct LabelRow {
 //   - convert target_layers / true_layers with std::stoi
 //   - return all rows
 std::vector<LabelRow> readLabels(const std::string& path) {
-    (void)path;
-    LA_TODO("readLabels");
+    std::ifstream file(path);
+    if (!file) throw std::runtime_error("readLabels: could not open " + path);
+
+    std::vector<LabelRow> rows;
+    std::string line;
+    bool header = true;
+    while (std::getline(file, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (header) {
+            header = false;
+            continue;
+        }
+        if (line.empty()) continue;
+
+        std::stringstream ss(line);
+        std::string fileName, pattern, targetText, trueText, notes;
+        if (!std::getline(ss, fileName, ',')) continue;
+        if (!std::getline(ss, pattern, ',')) continue;
+        if (!std::getline(ss, targetText, ',')) continue;
+        if (!std::getline(ss, trueText, ',')) continue;
+        std::getline(ss, notes);
+
+        try {
+            LabelRow row;
+            row.file = fileName;
+            row.pattern = pattern;
+            row.targetLayers = std::stoi(targetText);
+            row.trueLayers = std::stoi(trueText);
+            row.notes = notes;
+            rows.push_back(row);
+        } catch (const std::exception& e) {
+            throw std::runtime_error("readLabels: invalid numeric field in " + path +
+                                     " (" + e.what() + ")");
+        }
+    }
+    return rows;
 }
 
 // ---------------------------------------------------------------------------
@@ -76,8 +110,43 @@ struct BatchResult {
 };
 
 BatchResult scoreRow(const LabelRow& row, const std::string& photoDir) {
-    (void)row; (void)photoDir;
-    LA_TODO("scoreRow");
+    BatchResult result;
+    result.label = row;
+    std::string stage = "load images";
+
+    try {
+        const std::string referencePath =
+            "data/reference/" + row.pattern + std::to_string(row.targetLayers) + ".jpg";
+        const std::string userPath = photoDir + "/" + row.file;
+
+        stage = "load images";
+        const cv::Mat refImg = io::loadColor(referencePath);
+        const cv::Mat userImg = io::loadColor(userPath);
+
+        PatternSpec spec;
+        spec.name = row.pattern;
+        spec.targetLayers = row.targetLayers;
+        PipelineResult r = runPipeline(refImg, userImg, spec, &stage);
+
+        result.detectedLayers = r.userLayers.count;
+        result.fftLayers = r.userLayers.fftCount;
+        result.uncertain = r.userLayers.uncertain;
+        result.U = r.score.U;
+        result.Q = r.score.Q;
+        result.contrast = r.quality.contrast.score;
+        result.shape = r.quality.shape.score;
+        result.texture = r.quality.texture.score;
+        result.position = r.quality.position.score;
+        result.size = r.quality.size.score;
+        result.finalScore = r.score.finalScore;
+    } catch (const std::exception& e) {
+        std::string message = stage + ": " + e.what();
+        for (char& ch : message) {
+            if (ch == ',') ch = ';';
+        }
+        result.error = message;
+    }
+    return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -88,8 +157,25 @@ BatchResult scoreRow(const LabelRow& row, const std::string& photoDir) {
 //   final_score,error
 // Then one line per result. layer_correct = 1 if detectedLayers == trueLayers.
 void writeResults(const std::string& path, const std::vector<BatchResult>& results) {
-    (void)path; (void)results;
-    LA_TODO("writeResults");
+    std::ofstream file(path);
+    if (!file) throw std::runtime_error("writeResults: could not open " + path);
+
+    file << "file,pattern,target_layers,true_layers,detected_layers,fft_layers,"
+         << "uncertain,layer_correct,U,Q,contrast,shape,texture,position,size,"
+         << "final_score,error\n";
+
+    for (const BatchResult& r : results) {
+        const int layerCorrect =
+            r.error.empty() && r.detectedLayers == r.label.trueLayers ? 1 : 0;
+        file << r.label.file << ',' << r.label.pattern << ','
+             << r.label.targetLayers << ',' << r.label.trueLayers << ','
+             << r.detectedLayers << ',' << r.fftLayers << ','
+             << (r.uncertain ? 1 : 0) << ',' << layerCorrect << ','
+             << r.U << ',' << r.Q << ','
+             << r.contrast << ',' << r.shape << ',' << r.texture << ','
+             << r.position << ',' << r.size << ','
+             << r.finalScore << ',' << r.error << '\n';
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -98,8 +184,24 @@ void writeResults(const std::string& path, const std::vector<BatchResult>& resul
 //   layer count correct: 6 / 8 (75.0%)
 // (count only rows without an error for the accuracy)
 void printSummary(const std::vector<BatchResult>& results) {
-    (void)results;
-    LA_TODO("printSummary");
+    int scored = 0;
+    int correct = 0;
+    int errors = 0;
+
+    for (const BatchResult& r : results) {
+        if (!r.error.empty()) {
+            ++errors;
+            continue;
+        }
+        ++scored;
+        if (r.detectedLayers == r.label.trueLayers) ++correct;
+    }
+
+    const double percent = scored == 0 ? 0.0 : 100.0 * correct / scored;
+    std::printf("rows: %zu, scored: %d, errors: %d\n",
+                results.size(), scored, errors);
+    std::printf("layer count correct: %d / %d (%.1f%%)\n",
+                correct, scored, percent);
 }
 
 }  // namespace
