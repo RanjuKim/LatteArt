@@ -1,4 +1,4 @@
-﻿// Owner: Jaeku Kang
+// Owner: Jaeku Kang
 #include "structure/layers.h"
 #include <algorithm>
 #include <cmath>
@@ -156,20 +156,22 @@ struct Scan {
     std::vector<Peak> peaks;
     bool hasPattern = false;
 };
-Scan scan(const Frame &f, int x, const LayerParams &p) {
+Scan scan(const Frame &f, int fixed, ScanDirection direction, const LayerParams &p) {
     std::vector<float> profile(frame);
     std::vector<unsigned char> support(frame, 0);
     Scan out;
-    for (int y = 0; y < frame; ++y) {
+    for (int along = 0; along < frame; ++along) {
         int n = 0;
-        for (int xx = std::max(0, x - p.stripHalfWidth);
-             xx <= std::min(frame - 1, x + p.stripHalfWidth); ++xx) {
-            profile[y] += f.gray.ptr<float>(y)[xx];
-            support[y] |= f.mask.ptr<uchar>(y)[xx];
+        for (int across = std::max(0, fixed - p.stripHalfWidth);
+             across <= std::min(frame - 1, fixed + p.stripHalfWidth); ++across) {
+            const int x = direction == ScanDirection::Vertical ? across : along;
+            const int y = direction == ScanDirection::Vertical ? along : across;
+            profile[along] += f.gray.ptr<float>(y)[x];
+            support[along] |= f.mask.ptr<uchar>(y)[x];
             ++n;
         }
-        profile[y] /= n;
-        out.hasPattern = out.hasPattern || support[y] != 0;
+        profile[along] /= n;
+        out.hasPattern = out.hasPattern || support[along] != 0;
     }
     out.peaks = extract(profile, support, p);
     return out;
@@ -202,24 +204,28 @@ StructureComparison compareFrames(const Frame &ref, const Frame &user, float ang
         out.sizeMessage = "가로폭 크기가 맞지 않습니다.";
     else if (height)
         out.sizeMessage = "세로폭 크기가 맞지 않습니다.";
-    for (int x = margin; x < frame - margin; x += p.scanStep) {
-        auto r = scan(ref, x, p), u = scan(user, x, p);
-        if (!r.hasPattern && !u.hasPattern)
-            continue;
-        auto line = matchLayers(r.peaks, u.peaks, p);
-        line.x = float(x - margin + 0.5f) / extent;
-        // No measurable brightness peaks on a selected line is not a perfect match.
-        if (r.peaks.empty() && u.peaks.empty()) {
-            line.U = 0;
-            line.bandLow = 0;
-            line.bandHigh = 29;
+    for (auto direction : {ScanDirection::Vertical, ScanDirection::Horizontal}) {
+        for (int fixed = margin; fixed < frame - margin; fixed += p.scanStep) {
+            auto r = scan(ref, fixed, direction, p), u = scan(user, fixed, direction, p);
+            if (!r.hasPattern && !u.hasPattern)
+                continue;
+            auto line = matchLayers(r.peaks, u.peaks, p);
+            line.direction = direction;
+            line.coordinate = float(fixed - margin + 0.5f) / extent;
+            // No measurable brightness peaks on a selected line is not a perfect match.
+            if (r.peaks.empty() && u.peaks.empty()) {
+                line.U = 0;
+                line.bandLow = 0;
+                line.bandHigh = 29;
+            }
+            out.lines.push_back(std::move(line));
         }
-        out.alignmentScore += line.bandLow + (line.bandHigh - line.bandLow) * line.U;
-        out.lines.push_back(std::move(line));
     }
     if (out.lines.empty())
         throw std::runtime_error("비교할 패턴 선이 없습니다.");
-    out.alignmentScore /= out.lines.size();
+    const auto vertical = scoring::summarizeDirection(out, ScanDirection::Vertical, 0);
+    const auto horizontal = scoring::summarizeDirection(out, ScanDirection::Horizontal, 0);
+    out.alignmentScore = (vertical.alignmentScore + horizontal.alignmentScore) * .5f;
     return out;
 }
 } // namespace

@@ -9,6 +9,8 @@
 #include "debug/debug.h"
 #include "io/io.h"
 #include "viz/report.h"
+#include "scoring/scoring.h"
+#include "structure/layers.h"
 
 namespace la::debug {
 
@@ -272,16 +274,16 @@ namespace la::debug {
         spec.name = "tulip";
         spec.targetLayers = 3;
 
-        LayerResult reference;
-        reference.count = 3;
-        reference.fftCount = 3;
-
-        LayerResult user;
-        user.count = 3;
-        user.fftCount = 3;
-        user.spacingCV = 0.12f;
-        user.thicknessCV = 0.18f;
-        user.U = 0.80f;
+        StructureComparison structure;
+        structure.sizeOk = true;
+        const std::vector<Peak> reference{{.2f, .05f}, {.5f, .05f}, {.8f, .05f}};
+        auto same = structure::matchLayers(reference, reference);
+        same.coordinate = .25f;
+        auto missing = structure::matchLayers(reference, {{.2f, .05f}, {.8f, .05f}});
+        missing.coordinate = .75f;
+        auto horizontal = same;
+        horizontal.direction = ScanDirection::Horizontal;
+        structure.lines = {same, missing, horizontal};
 
         QualityResult quality;
         quality.contrast = {
@@ -301,24 +303,16 @@ namespace la::debug {
         };
         quality.Q = 0.855f;
 
-        ScoreResult score;
-        score.deltaN = 0;
-        score.bandLow = 60.f;
-        score.bandHigh = 100.f;
-        score.U = user.U;
-        score.Q = quality.Q;
-        score.finalScore = 93.54f;
+        ScoreResult score = scoring::computeScore(structure, quality.Q);
 
         std::printf("\n[DEMO 1: synthetic scoring data]\n");
-        viz::printReport(spec, reference, user, quality, score);
+        viz::printReport(spec, structure, quality, score);
 
         // Preview the uncertain-result display as well.
-        user.fftCount = 2;
-        user.uncertain = true;
         score.needsReview = true;
 
         std::printf("\n[DEMO 2: synthetic uncertain result]\n");
-        viz::printReport(spec, reference, user, quality, score);
+        viz::printReport(spec, structure, quality, score);
     }
 
     int runPreprocess(const Args& args) {

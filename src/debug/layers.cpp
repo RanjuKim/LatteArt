@@ -1,9 +1,10 @@
-﻿// Owner: Jaeku Kang
+// Owner: Jaeku Kang
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <fstream>
 #include <stdexcept>
+#include <type_traits>
 #include "app/pipeline.h"
 #include "basic/geometry.h"
 #include "debug/debug.h"
@@ -76,7 +77,24 @@ Fixture rotated(const Fixture &f, float angle) {
     out.mask.centroid = {float(sumX / count), float(sumY / count)};
     return out;
 }
+Fixture transposed(const Fixture &f) {
+    Fixture out;
+    cv::Mat bgr(512, 512, CV_8UC3), mask(512, 512, CV_8UC1);
+    for (int y = 0; y < 512; ++y)
+        for (int x = 0; x < 512; ++x) {
+            for (int c = 0; c < 3; ++c)
+                bgr.ptr<uchar>(y)[3*x+c] = f.cup.bgr.ptr<uchar>(x)[3*y+c];
+            mask.ptr<uchar>(y)[x] = f.mask.mask.ptr<uchar>(x)[y];
+        }
+    out.cup = normalize::fromCanonicalImage(bgr);
+    out.mask = f.mask;
+    out.mask.mask = mask;
+    out.mask.centroid = {f.mask.centroid.y, f.mask.centroid.x};
+    return out;
+}
 int selfTest() {
+    static_assert(std::is_same_v<StructureComparison, structure::StructureComparison>);
+    static_assert(std::is_same_v<LineComparison, structure::LineComparison>);
     using structure::matchLayers;
     using structure::Peak;
     structure::LayerParams p;
@@ -94,6 +112,50 @@ int selfTest() {
           "skip gap compares same endpoints and preserves count penalty");
     auto extra = matchLayers({{.2f, .05f}, {.6f, .05f}, {.8f, .05f}}, ref, p);
     check(extra.extra == 1 && extra.missing == 0, "extra layer penalty");
+    auto replaced = matchLayers({{.2f, .05f}, {.4f, .05f}},
+                                {{.2f, .05f}, {.9f, .05f}}, p);
+    check(replaced.reference.size() == replaced.user.size() &&
+              replaced.missing == 1 && replaced.extra == 1 && replaced.bandHigh == 59,
+          "equal counts retain missing and extra layers in shared result");
+    StructureComparison shared;
+    shared.sizeOk = true;
+    shared.lines = {same, missing, extra, replaced};
+    shared.lines[0].coordinate = .1f;
+    shared.lines[1].coordinate = .3f;
+    shared.lines[2].coordinate = .6f;
+    shared.lines[3].coordinate = .9f;
+    auto horizontalOnly = same;
+    horizontalOnly.direction = ScanDirection::Horizontal;
+    shared.lines.push_back(horizontalOnly);
+    const StructureComparison delivered = shared;
+    bool validMatches = true;
+    for (const auto &line : delivered.lines) {
+        validMatches &= line.reference.size() == line.matches.size() + line.missing;
+        validMatches &= line.user.size() == line.matches.size() + line.extra;
+        int lastReference = -1, lastUser = -1;
+        for (const auto &match : line.matches) {
+            validMatches &= match.reference > lastReference && match.user > lastUser &&
+                            match.reference < int(line.reference.size()) &&
+                            match.user < int(line.user.size());
+            lastReference = match.reference;
+            lastUser = match.user;
+        }
+    }
+    check(validMatches && delivered.lines[1].reference.size() == 4 &&
+              delivered.lines[1].user.size() == 3 && delivered.lines[1].coordinate == .3f &&
+              delivered.lines[1].matches[1].reference == 2,
+          "shared result preserves per-line counts, coordinates and skipped-layer matches");
+    const auto mixedScore = scoring::computeScore(delivered, 1);
+    check(std::abs(mixedScore.vertical.finalScore - 69.25f) < .01f &&
+              std::abs(mixedScore.horizontal.finalScore - 100) < .01f &&
+              std::abs(mixedScore.finalScore - 84.625f) < .01f,
+          "unequal direction counts still receive 50/50 weight");
+    auto incomplete = shared;
+    incomplete.lines.pop_back();
+    bool directionRejected = false;
+    try { scoring::computeScore(incomplete, 1); }
+    catch (const std::invalid_argument &) { directionRejected = true; }
+    check(directionRejected, "missing scan direction does not silently change weights");
     auto jitter = matchLayers(ref, {{.21f, .05f}, {.39f, .05f}, {.61f, .05f}, {.79f, .05f}}, p);
     check(jitter.matches.size() == 4 && jitter.missing == 0 && jitter.U < 1,
           "small location jitter matches but spacing is graded");
@@ -105,10 +167,10 @@ int selfTest() {
     check(s.sizeOk && s.lines.size() > 10 && s.alignmentScore > 99.9f,
           "identical multi-line score");
     auto final = scoring::computeScore(s, 1);
-    check(final.finalScore > 99.9f && final.deltaN == -1,
+    check(final.finalScore > 99.9f,
           "multi-line final score without invented global count");
     auto lower = scoring::computeScore(s, 0);
-    check(std::abs(lower.finalScore - 72) < .01f, "band floor and 30/70 quality weighting");
+    check(std::abs(lower.finalScore - 80) < .01f, "band floor and 50/50 structure-quality weighting");
     auto shifted = fixture(1, 1, 17, -9);
     auto ss = structure::compareAtAngle(f.cup, f.mask, shifted.cup, shifted.mask, 0, p);
     check(ss.alignmentScore > 99.9f && ss.sizeOk,
@@ -142,16 +204,40 @@ int selfTest() {
     auto sm = structure::compareAtAngle(f.cup, f.mask, absent.cup, absent.mask, 0, p);
     check(sm.sizeOk && sm.alignmentScore < s.alignmentScore - 10,
           "missing middle stripe reduces image structure score");
+    auto tf = transposed(f), ta = transposed(absent);
+    auto st = structure::compareAtAngle(tf.cup, tf.mask, ta.cup, ta.mask, 0, p);
+    const auto originalDirections = scoring::computeScore(sm, .8f);
+    const auto swappedDirections = scoring::computeScore(st, .8f);
+    check(std::abs(originalDirections.vertical.finalScore - swappedDirections.horizontal.finalScore) < .001f &&
+              std::abs(originalDirections.horizontal.finalScore - swappedDirections.vertical.finalScore) < .001f &&
+              std::abs(originalDirections.finalScore - swappedDirections.finalScore) < .001f,
+          "transposition swaps scan directions and preserves their equal-weight score");
+    check(std::abs(sm.alignmentScore - st.alignmentScore) < .001f,
+          "rotation objective uses the same direction-balanced structure score");
     auto turn = rotated(f, 37);
     auto sr = structure::compareStructure(f.cup, f.mask, turn.cup, turn.mask, p);
     std::printf("rotation selected %.1f score %.3f size %.3f %.3f\n", sr.angleDeg,
                 sr.alignmentScore, sr.widthDifference, sr.heightDifference);
-    check(sr.sizeOk && sr.alignmentScore > 90 && std::abs(sr.angleDeg - 323) <= 3,
+    // Both scan directions now contribute: rotated thin edges lose more peak
+    // agreement to interpolation than the former vertical-only measurement.
+    check(sr.sizeOk && sr.alignmentScore > 80 && std::abs(sr.angleDeg - 323) <= 3,
           "coarse-to-fine recovers 37 degree rotation");
     std::string stage;
     auto pipeline = app::scoreNormalized(f.cup, f.cup, p, &stage);
     check(pipeline.score.finalScore > 90 && !pipeline.structure.lines.empty(),
           "canonical pipeline includes existing quality metrics");
+    check(std::abs((pipeline.score.vertical.finalScore + pipeline.score.horizontal.finalScore) / 2 -
+                       pipeline.score.finalScore) < .001f,
+          "direction means reproduce the pipeline final score");
+    PatternSpec unspecified;
+    stage.clear();
+    try {
+        app::runPipeline(cv::Mat(), cv::Mat(), unspecified, &stage);
+    } catch (const std::exception &) {
+        // Deliberately invalid photo: metadata must not reject before normalization.
+    }
+    check(stage == "normalize reference",
+          "unspecified catalog layer count does not gate the pipeline");
     auto translatedPipeline = app::scoreNormalized(f.cup, shifted.cup, p, &stage);
     check(translatedPipeline.structure.alignmentScore > 99 &&
               translatedPipeline.quality.position.score < 0.9f,
@@ -166,6 +252,7 @@ int selfTest() {
     io::save("debug_layers_synthetic_reference.png", f.cup.bgr);
     io::save("debug_layers_synthetic_missing.png", absent.cup.bgr);
     io::save("debug_layers_synthetic_rotated.png", turn.cup.bgr);
+    io::save("debug_layers_synthetic_wrong_size.png", wrongBoth.cup.bgr);
     return 0;
 }
 float number(const std::string &s) {
@@ -180,9 +267,8 @@ void saveCsv(const structure::StructureComparison &s, const std::string &prefix,
     std::ofstream lines(prefix + "_lines.csv"), matches(prefix + "_matches.csv");
     if (!lines || !matches)
         throw std::runtime_error("cannot write structure CSV files");
-    lines << "x,reference_count,user_count,missing,extra,spacing,thickness,U,band_low,band_high,"
-             "final_score\n";
-    matches << "x,reference_index,user_index,reference_y,user_y,reference_width,user_width\n";
+    lines << "direction,coordinate,reference_count,user_count,missing,extra,spacing,thickness,U,band_low,band_high,final_score\n";
+    matches << "direction,coordinate,reference_index,user_index,reference_position,user_position,reference_width,user_width\n";
     std::ofstream summary(prefix + "_summary.csv");
     if (!summary)
         throw std::runtime_error("cannot write structure summary");
@@ -194,20 +280,20 @@ void saveCsv(const structure::StructureComparison &s, const std::string &prefix,
     if (scored)
         summary << Q;
     summary << '\n';
-    cv::Mat diagram(256, 528, CV_8UC3);
+    cv::Mat diagram(544, 528, CV_8UC3);
     for (int y = 0; y < diagram.rows; ++y)
         for (int x = 0; x < diagram.cols * 3; ++x)
             diagram.ptr<uchar>(y)[x] = 24;
     for (const auto &l : s.lines) {
-        lines << l.x << ',' << l.reference.size() << ',' << l.user.size() << ',' << l.missing << ','
+        lines << directionName(l.direction) << ',' << l.coordinate << ',' << l.reference.size() << ',' << l.user.size() << ',' << l.missing << ','
               << l.extra << ',' << l.spacingScore << ',' << l.thicknessScore << ',' << l.U << ','
               << l.bandLow << ',' << l.bandHigh << ',';
         if (scored)
-            lines << l.bandLow + (l.bandHigh - l.bandLow) * (.3f * l.U + .7f * Q);
+            lines << scoring::computeLineScore(l, Q);
         lines << '\n';
         for (auto m : l.matches) {
             auto r = l.reference[m.reference], u = l.user[m.user];
-            matches << l.x << ',' << m.reference << ',' << m.user << ',' << r.position << ','
+            matches << directionName(l.direction) << ',' << l.coordinate << ',' << m.reference << ',' << m.user << ',' << r.position << ','
                     << u.position << ',' << r.width << ',' << u.width << '\n';
         }
         auto show = [&](const std::vector<structure::Peak> &peaks, bool user) {
@@ -217,24 +303,28 @@ void saveCsv(const structure::StructureComparison &s, const std::string &prefix,
                     if ((user ? m.user : m.reference) == int(k))
                         matched = true;
                 if (!matched) {
-                    matches << l.x << ',' << (user ? -1 : int(k)) << ',' << (user ? int(k) : -1)
+                    matches << directionName(l.direction) << ',' << l.coordinate << ',' << (user ? -1 : int(k)) << ',' << (user ? int(k) : -1)
                             << ',';
                     if (user)
                         matches << ',' << peaks[k].position << ",," << peaks[k].width << '\n';
                     else
                         matches << peaks[k].position << ",," << peaks[k].width << ",\n";
                 }
-                int x = int(l.x * 224) + 16 + (user ? 272 : 0);
-                int top = int(16 + (peaks[k].position - peaks[k].width / 2) * 224);
-                int bottom = int(16 + (peaks[k].position + peaks[k].width / 2) * 224);
-                for (int y = std::max(0, top); y <= std::min(255, bottom); ++y)
-                    for (int dx = -1; dx <= 1; ++dx)
-                        if (x + dx >= 0 && x + dx < diagram.cols) {
-                            auto d = diagram.ptr<uchar>(y) + 3 * (x + dx);
-                            d[0] = matched ? 80 : 40;
-                            d[1] = matched ? 220 : 40;
-                            d[2] = matched ? 80 : 240;
-                        }
+                const bool vertical = l.direction == ScanDirection::Vertical;
+                const int offsetX = user ? 272 : 0, offsetY = vertical ? 0 : 288;
+                const int fixed = int(l.coordinate * 224) + 16;
+                int first = int(16 + (peaks[k].position - peaks[k].width / 2) * 224);
+                int last = int(16 + (peaks[k].position + peaks[k].width / 2) * 224);
+                for (int along = std::max(0, first); along <= std::min(255, last); ++along)
+                    for (int across = fixed - 1; across <= fixed + 1; ++across) {
+                        const int x = offsetX + (vertical ? across : along);
+                        const int y = offsetY + (vertical ? along : across);
+                        if (x < 0 || y < 0 || x >= diagram.cols || y >= diagram.rows) continue;
+                        auto d = diagram.ptr<uchar>(y) + 3 * x;
+                        d[0] = matched ? 80 : 40;
+                        d[1] = matched ? 220 : 40;
+                        d[2] = matched ? 80 : 240;
+                    }
             }
         };
         show(l.reference, false);

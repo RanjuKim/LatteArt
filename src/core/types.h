@@ -22,11 +22,13 @@ namespace la {
 // Canonical frame every normalized cup is mapped into.
 constexpr int   kCanonicalSize   = 512;    // output image is 512 x 512
 constexpr float kCanonicalRadius = 240.f;  // cup rim radius in that image
-// Pattern main axis is rotated to point straight up (-y direction).
+// Reference should be upright. Pipeline rotates the user to best match it.
 
 struct PatternSpec {
     std::string name;      // "heart", "tulip", ...
-    int targetLayers = 0;  // e.g. 3 for a three-tier tulip
+    // Optional catalog metadata (e.g. a three-tier tulip), NOT a scoring target.
+    // Legacy CLI/batch still use it to label/select the reference photo.
+    int targetLayers = 0;
 };
 
 // Output of normalize/. Input of everything else.
@@ -50,18 +52,48 @@ struct PatternMask {
     float area = 0.f;  // pixels
 };
 
-// Output of structure/layers.cpp
-struct LayerResult {
-    int count = 0;                    // layers from peak detection
-    int fftCount = 0;                 // layers from dominant frequency
-    bool uncertain = false;           // count != fftCount -> human review
-    std::vector<float> profile;       // averaged brightness along the axis
-    std::vector<float> peakPos;       // peak positions (pixels along axis)
-    std::vector<float> spacings;      // distances between adjacent peaks
-    std::vector<float> fwhm;          // full width at half maximum per peak
-    float spacingCV = 0.f;
-    float thicknessCV = 0.f;
-    float U = 0.f;                    // uniformity score 0..1
+// Shared multi-line structure contract. Coordinates refer to the pattern after
+// bounding-box centering and independent width/height normalization, not the cup.
+// Sampling direction is independent of the quality/symmetry axis.
+enum class ScanDirection { Vertical, Horizontal };
+inline const char* directionName(ScanDirection direction) {
+    return direction == ScanDirection::Vertical ? "vertical" : "horizontal";
+}
+struct Peak {
+    float position = 0; // fraction along scan: top->bottom or left->right
+    float width = 0;    // FWHM, fraction of pattern extent along scan
+};
+
+struct PeakMatch {
+    int reference = -1, user = -1;
+};
+
+struct LineComparison {
+    ScanDirection direction = ScanDirection::Vertical;
+    float coordinate = 0; // vertical: fixed x / width; horizontal: fixed y / height
+    // Ordered along the scan direction; size() is the peak count on this line.
+    std::vector<Peak> reference, user;
+    // Only successful pairs, in order, with valid indices into the above vectors.
+    // Unmatched peaks are absent from matches; each peak is matched at most once.
+    std::vector<PeakMatch> matches;
+    // reference.size() == matches.size() + missing; likewise user and extra.
+    int missing = 0, extra = 0;
+    float spacingScore = 0, thicknessScore = 0, U = 0; // 0..1
+    float bandLow = 0, bandHigh = 0; // this line's score bounds, NOT image bounds
+};
+
+struct StructureComparison {
+    // Vertical then horizontal, each with increasing coordinate. Includes support on either image;
+    // a selected line may have no detectable peaks. No image-wide layer count.
+    std::vector<LineComparison> lines;
+    float angleDeg = 0; // clockwise rotation applied to the user image
+    float alignmentScore = 0; // structural search score (0..100), excludes Q
+    // Bounding-box dimensions in canonical-cup pixels, after rotation but BEFORE
+    // independent pattern scaling. Differences are abs(user/reference - 1).
+    float referenceWidth = 0, referenceHeight = 0, userWidth = 0, userHeight = 0;
+    float widthDifference = 0, heightDifference = 0;
+    bool sizeOk = false; // false means final scoring must not proceed
+    std::string sizeMessage;
 };
 
 // One quality item: raw measurement + normalized score + explanation.
@@ -81,8 +113,17 @@ struct QualityResult {
     float Q = 0.f;       // weighted sum 0..1
 };
 
+struct DirectionScore {
+    size_t lineCount = 0;
+    float bandLow = 0, bandHigh = 0, U = 0;
+    float alignmentScore = 0; // mean L + (H-L)*U, used for rotation search
+    float finalScore = 0; // mean L + (H-L)*(alpha*U + (1-alpha)*Q); scoring sets alpha
+};
+
 struct ScoreResult {
-    int deltaN = 0;
+    DirectionScore vertical, horizontal;
+    // Direction means receive equal weight regardless of line counts.
+    // Bounds can be fractional; they are not a single count-error band.
     float bandLow = 0.f, bandHigh = 0.f;
     float U = 0.f, Q = 0.f;
     float finalScore = 0.f;

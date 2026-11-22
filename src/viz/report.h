@@ -5,14 +5,13 @@
 
 namespace la::viz {
 
-void printReport(const PatternSpec& spec, const LayerResult& refLayers,
-                 const LayerResult& userLayers, const QualityResult& q, const ScoreResult& s);
+void printReport(const PatternSpec& spec, const StructureComparison& structure,
+                 const QualityResult& q, const ScoreResult& s);
 
-// Reference | user cups side by side with detected layers, axis and
-// problem areas drawn on top. Returns CV_8UC3.
-cv::Mat renderResult(const NormalizedCup& ref, const PatternMask& refMask,
-                     const LayerResult& refLayers, const NormalizedCup& user,
-                     const PatternMask& userMask, const LayerResult& userLayers,
-                     const ScoreResult& s);
+// Reference | already-rotated user cups, with separate normalized per-line
+// diagrams below. No second rotation, or coordinate projection onto raw photos.
+// Green = matched, red = missing reference peak, yellow = extra user peak.
+cv::Mat renderResult(const NormalizedCup& ref, const NormalizedCup& user,
+                     const StructureComparison& structure, const ScoreResult& s);
 
 }  // namespace la::viz

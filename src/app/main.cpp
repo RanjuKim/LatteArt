@@ -2,7 +2,7 @@
 // LatteArt - automated latte art scoring (Team 22)
 //
 // Usage:
-//   LatteArt.exe <reference.jpg> <user.jpg> <pattern:layers> [result.png]
+//   LatteArt.exe <reference.jpg> <user.jpg> <pattern[:catalog_layers]> [result.png] [--no-show]
 //   LatteArt.exe --canon <photo.jpg> <cx> <cy> <r> <out.png>
 //   LatteArt.exe --batch <labels.csv> <photo_dir> <out.csv>
 //   LatteArt.exe --debug <stage> [args...]   (see src/debug/debug.h)
@@ -23,18 +23,23 @@ namespace {
 
 la::PatternSpec parsePattern(const std::string& s) {
     const auto colon = s.find(':');
-    if (colon == std::string::npos) throw std::invalid_argument("pattern must look like tulip:3");
     la::PatternSpec spec;
     spec.name = s.substr(0, colon);
-    spec.targetLayers = std::stoi(s.substr(colon + 1));
-    if (spec.targetLayers <= 0) throw std::invalid_argument("layer count must be positive");
+    if (spec.name.empty()) throw std::invalid_argument("pattern name must not be empty");
+    if (colon != std::string::npos) {
+        const std::string value = s.substr(colon + 1);
+        size_t used = 0;
+        spec.targetLayers = std::stoi(value, &used);
+        if (used != value.size() || spec.targetLayers <= 0)
+            throw std::invalid_argument("optional catalog layer count must be a positive integer");
+    }
     return spec;
 }
 
 void usage() {
     std::printf(
         "Usage:\n"
-        "  LatteArt.exe <reference.jpg> <user.jpg> <pattern:layers> [result.png]\n"
+        "  LatteArt.exe <reference.jpg> <user.jpg> <pattern[:catalog_layers]> [result.png] [--no-show]\n"
         "  LatteArt.exe --canon <photo.jpg> <cx> <cy> <r> <out.png>\n"
         "  LatteArt.exe --batch <labels.csv> <photo_dir> <out.csv>\n"
         "  LatteArt.exe --debug <preprocess|normalize|segment|layers|quality|viz> [args...]\n");
@@ -73,7 +78,16 @@ int runDebug(int argc, char** argv) {
 int runScore(int argc, char** argv, std::string& stage) {
     stage = "parse arguments";
     const la::PatternSpec spec = parsePattern(argv[3]);
-    const std::string outPath = argc >= 5 ? argv[4] : "result.png";
+    std::string outPath = "result.png";
+    bool show = true, hasOutput = false;
+    for (int i = 4; i < argc; ++i) {
+        const std::string arg = argv[i];
+        if (arg == "--no-show") show = false;
+        else if (!hasOutput && arg.rfind("--", 0) != 0) {
+            outPath = arg;
+            hasOutput = true;
+        } else throw std::invalid_argument("unexpected scoring argument: " + arg);
+    }
 
     stage = "load images";
     const cv::Mat refImg = la::io::loadColor(argv[1]);
@@ -81,14 +95,16 @@ int runScore(int argc, char** argv, std::string& stage) {
 
     const la::app::PipelineResult r = la::app::runPipeline(refImg, userImg, spec, &stage);
     if (!r.user.ok) std::printf("[warn] %s\n", r.user.warning.c_str());
-    la::viz::printReport(spec, r.refLayers, r.userLayers, r.quality, r.score);
+    la::viz::printReport(spec, r.structure, r.quality, r.score);
 
     stage = "render result";
-    const cv::Mat vis = la::viz::renderResult(r.ref, r.refMask, r.refLayers, r.user, r.userMask,
-                                              r.userLayers, r.score);
+    const cv::Mat vis = la::viz::renderResult(r.ref, r.user, r.structure, r.score);
     la::io::save(outPath, vis);
-    la::io::show("LatteArt result", vis);
-    la::io::waitKey(0);
+    std::printf("saved %s\n", outPath.c_str());
+    if (show) {
+        la::io::show("LatteArt result", vis);
+        la::io::waitKey(0);
+    }
     return 0;
 }
 

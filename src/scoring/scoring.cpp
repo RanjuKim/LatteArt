@@ -1,8 +1,8 @@
 // Owner: Jaeku Kang
 #include "scoring/scoring.h"
+#include "structure/layers.h"
 
 #include <algorithm>
-#include <cstdlib>
 #include <cmath>
 #include <stdexcept>
 
@@ -18,40 +18,49 @@ Band bandFor(int deltaN) {
     return {0.f, 29.f};
 }
 
-ScoreResult computeScore(const LayerResult &layers, int targetLayers, float Q) {
-    if (layers.count < 0 || targetLayers <= 0 || !std::isfinite(Q) || !std::isfinite(layers.U))
-        throw std::invalid_argument("computeScore: invalid input");
-    ScoreResult r;
-    r.deltaN = std::abs(layers.count - targetLayers);
-    const Band band = bandFor(r.deltaN);
-    r.bandLow = band.low;
-    r.bandHigh = band.high;
-    r.U = std::clamp(layers.U, 0.f, 1.f);
-    r.Q = std::clamp(Q, 0.f, 1.f);
-    r.finalScore = band.low + (band.high - band.low) * (0.3f * r.U + 0.7f * r.Q);
-    r.needsReview = layers.uncertain;
-    return r;
+float computeLineScore(const LineComparison &line, float Q) {
+    if (!std::isfinite(Q) || !std::isfinite(line.U) || !std::isfinite(line.bandLow) ||
+        !std::isfinite(line.bandHigh) || line.bandHigh < line.bandLow)
+        throw std::invalid_argument("computeLineScore: invalid input");
+    return line.bandLow + (line.bandHigh - line.bandLow) *
+           (kStructureWeight * line.U + (1 - kStructureWeight) * std::clamp(Q, 0.f, 1.f));
 }
 
-ScoreResult computeScore(const structure::StructureComparison &comparison, float Q) {
-    structure::requireMatchingSize(comparison);
-    if (comparison.lines.empty() || !std::isfinite(Q))
-        throw std::invalid_argument("computeScore: no lines or invalid quality");
-    ScoreResult out;
-    out.deltaN = -1;
-    out.Q = std::clamp(Q, 0.f, 1.f);
+DirectionScore summarizeDirection(const StructureComparison &comparison,
+                                  ScanDirection direction, float Q) {
+    if (!std::isfinite(Q)) throw std::invalid_argument("invalid quality");
+    DirectionScore out;
     for (const auto &line : comparison.lines) {
+        if (line.direction != ScanDirection::Vertical && line.direction != ScanDirection::Horizontal)
+            throw std::invalid_argument("invalid scan direction");
+        if (line.direction != direction) continue;
+        ++out.lineCount;
         out.bandLow += line.bandLow;
         out.bandHigh += line.bandHigh;
         out.U += line.U;
-        out.finalScore +=
-            line.bandLow + (line.bandHigh - line.bandLow) * (0.3f * line.U + 0.7f * out.Q);
+        out.alignmentScore += line.bandLow + (line.bandHigh - line.bandLow) * line.U;
+        out.finalScore += computeLineScore(line, Q);
     }
-    const float n = float(comparison.lines.size());
+    if (!out.lineCount) throw std::invalid_argument("no lines for required scan direction");
+    const float n = float(out.lineCount);
     out.bandLow /= n;
     out.bandHigh /= n;
     out.U /= n;
+    out.alignmentScore /= n;
     out.finalScore /= n;
+    return out;
+}
+
+ScoreResult computeScore(const StructureComparison &comparison, float Q) {
+    structure::requireMatchingSize(comparison);
+    ScoreResult out;
+    out.vertical = summarizeDirection(comparison, ScanDirection::Vertical, Q);
+    out.horizontal = summarizeDirection(comparison, ScanDirection::Horizontal, Q);
+    out.Q = std::clamp(Q, 0.f, 1.f);
+    out.bandLow = (out.vertical.bandLow + out.horizontal.bandLow) * .5f;
+    out.bandHigh = (out.vertical.bandHigh + out.horizontal.bandHigh) * .5f;
+    out.U = (out.vertical.U + out.horizontal.U) * .5f;
+    out.finalScore = (out.vertical.finalScore + out.horizontal.finalScore) * .5f;
     return out;
 }
 

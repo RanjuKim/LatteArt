@@ -2,7 +2,8 @@
 
 Image Processing Team Project 02 (Global / Startup team).
 Scores a latte art photo against an expert reference photo of the same pattern,
-structure first (layer count), then quality (contrast, shape, texture, position, size).
+structure first (per-line layer correspondence, spacing and thickness), then quality
+(contrast, shape, texture, position, size). No single layer count is assigned to a photo.
 
 ## Build environment (everyone must match)
 
@@ -31,12 +32,49 @@ structure first (layer count), then quality (contrast, shape, texture, position,
 
 ## Run
 ```
-bin\Release\LatteArt.exe data\reference\tulip3.jpg data\user\tulip3_junkyu_01.jpg tulip:3 result.png
+bin\Release\LatteArt.exe data\reference\tulip3.jpg data\user\tulip3_junkyu_01.jpg tulip result.png
+bin\Release\LatteArt.exe reference.png user.png tulip result.png --no-show  # save without opening a window
 bin\Release\LatteArt.exe --canon photo.jpg <cx> <cy> <r> canon.png     # manual normalization to 512x512
 bin\Release\LatteArt.exe --debug <stage> [args...]                     # run one stage, save debug_<stage>_*.png
 bin\Release\LatteArt.exe --batch data\labels.csv data\user results.csv   # score the whole dataset
 ```
-Unimplemented steps throw `TODO: ...` and the program prints which stage stopped.
+The console reports each compared line and both directional scores. The result image shows the reference and
+aligned user cups above separate vertical/horizontal structure diagrams: green means matched,
+red means a missing reference peak, and yellow means an extra user peak.
+The optional old `tulip:3` syntax is still accepted; `3` is catalog metadata only.
+Cup detection and size failures stop scoring and report the stage and error.
+
+Batch input uses UTF-8 CSV with `file,pattern,reference,notes` columns (`notes` is optional).
+User file paths are relative to `<photo_dir>`; reference paths are relative to the
+labels CSV directory. Absolute paths and quoted commas/quotes/newlines are supported.
+Old `target_layers,true_layers` label files still work: `target_layers` selects
+`data/reference/<pattern><target_layers>.jpg` when no reference is given, while
+`true_layers` is ignored. Neither value is used as a scoring target.
+
+Batch output consists of `results.csv` (image summaries), `results_lines.csv`
+(per-line counts and scores), and `results_matches.csv` (matched/missing/extra peaks).
+Join these using `row_id` and `line_index`, not filenames, which may repeat.
+Summary missing/extra occurrences count events across lines, not distinct physical layers.
+Rejected/error rows have blank scores and no detail rows; remaining rows continue.
+The old global `detected_layers` and `layer_correct` output columns are removed.
+Each detail row has `direction` and `coordinate`: vertical fixes x and scans
+top to bottom; horizontal fixes y and scans left to right. Coordinates, peak
+positions and widths are normalized to the relevant pattern dimension.
+Image summaries include `vertical_lines`, `horizontal_lines`, `vertical_score`,
+`horizontal_score`, `vertical_structure` and `horizontal_structure`.
+
+Final score = (mean vertical line score + mean horizontal line score) / 2.
+The directions always have equal weight, even with different numbers of valid lines.
+Each line retains the count-error band and 50% spacing/thickness U, 50% quality Q
+formula. Rotation search also uses the equal directional mean of structure-only
+scores; quality is evaluated once at the selected rotation. Both directions are required.
+
+After building, run the end-to-end checks with two actual photos:
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/test_multiline_integration.ps1 -Reference reference.png -UserPhoto user.png
+```
+This test expects the photos to pass the size check. It also exercises synthetic
+size rejection and no-cup cases; all artifacts are written under ignored `data/raw/`.
 
 ## Owners
 
@@ -52,8 +90,12 @@ The first line of every source file says `// Owner: <name>` — edit only your o
 | SHARED (PR approved by all) | `core/*`, `io/*`, `app/main.cpp`, `debug/debug.h`, `LatteArt.vcxproj(.filters)`, `opencv.props` |
 
 ### Normalized frame (contract)
-Every `NormalizedCup` is 512×512, cup rim radius 240 px centered, pattern main axis pointing **up**.
-Until normalization is ready, quality/structure work can use hand-cropped images in this frame.
+Every `NormalizedCup` is 512×512, with the detected liquid surface mapped to a
+centered radius of 240 px. The reference should be upright; the pipeline searches
+the user's rotation against it. Structural comparison independently normalizes
+pattern width/height; quality evaluation retains the original cup-relative size/position.
+`core/types.h` exposes `StructureComparison.lines`; counts are the sizes of each
+line's reference/user peak lists. Correspondence indices preserve skipped layers.
 
 ## Library rule
 Only OpenCV I/O is allowed (assignment spec). Use `cv::Mat` as a container only
