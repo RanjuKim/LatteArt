@@ -1,6 +1,7 @@
 // Owner: Jaeku Kang
 // Count-ratio scoring: C = min(reference count, user count) / max(counts).
-// Empty detections use C=0. Line bounds are L=60*C, H=100*C.
+// Line bounds are L=60*C, H=100*C (C=0 for empty input).
+// Selected scanlines with no peaks on either side retain legacy bounds 0..29.
 // S = L + (H-L) * (alpha U + (1-alpha) Q).
 #pragma once
 #include "core/types.h"

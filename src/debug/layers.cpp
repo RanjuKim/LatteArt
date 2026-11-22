@@ -134,7 +134,7 @@ int selfTest() {
     const auto absentLine = matchLayers(ten, {}, p);
     check(scoring::computeLineScore(none, 1) == 0 &&
               scoring::computeLineScore(absentLine, 1) == 0,
-          "empty detections and one-sided missing structure cannot earn quality-only points");
+          "raw empty matches and one-sided missing structure have zero count bounds");
     const auto unpaired = matchLayers({{.1f, .02f}}, {{.9f, .02f}}, p);
     check(unpaired.matches.empty() && unpaired.U == 0 && unpaired.bandLow == 60 &&
               unpaired.bandHigh == 100 && scoring::computeLineScore(unpaired, 1) == 80 &&
@@ -189,6 +189,21 @@ int selfTest() {
     check(s.sizeOk && s.lines.size() > 10 && s.alignmentScore > 99.9f,
           "identical multi-line score");
     auto final = scoring::computeScore(s, 1);
+    auto flat = f;
+    flat.cup.gray = f.cup.gray.clone();
+    for (int y = 0; y < flat.cup.gray.rows; ++y)
+        std::fill(flat.cup.gray.ptr<float>(y),
+                  flat.cup.gray.ptr<float>(y) + flat.cup.gray.cols, .4f);
+    const auto flatComparison = structure::compareAtAngle(
+        flat.cup, flat.mask, flat.cup, flat.mask, 0, p);
+    bool legacyEmptyBounds = !flatComparison.lines.empty();
+    for (const auto& line : flatComparison.lines)
+        legacyEmptyBounds = legacyEmptyBounds && line.reference.empty() && line.user.empty() &&
+                            line.U == 0 && line.bandLow == 0 && line.bandHigh == 29;
+    check(legacyEmptyBounds &&
+              std::abs(scoring::computeScore(flatComparison, 1).finalScore - 14.5f) < .001f &&
+              scoring::computeScore(flatComparison, 0).finalScore == 0,
+          "selected lines with no peaks on either side preserve legacy 0..29 quality scoring");
     check(final.finalScore > 99.9f,
           "multi-line final score without invented global count");
     auto lower = scoring::computeScore(s, 0);

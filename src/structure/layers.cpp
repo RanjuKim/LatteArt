@@ -216,7 +216,7 @@ StructureComparison compareFrames(const Frame &ref, const Frame &user, float ang
             if (r.peaks.empty() && u.peaks.empty()) {
                 line.U = 0;
                 line.bandLow = 0;
-                line.bandHigh = 0;
+                line.bandHigh = 29;
             }
             out.lines.push_back(std::move(line));
         }
