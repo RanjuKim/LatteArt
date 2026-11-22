@@ -82,80 +82,199 @@ Texture texture(const cv::Mat &g, cv::Point2f p, const NormalizeParams &cfg) {
 struct Candidate {
     Ellipse e;
     std::vector<cv::Point2f> pts;
-    float coverage = 0, error = 0, score = 0;
+    std::vector<int> components;
+    std::string method = "component";
+    float coverage = 0, error = 0, score = 0, support = 1;
 };
-std::vector<Candidate> candidates(const cv::Mat &gray, const NormalizeParams &cfg) {
-    auto edges = basic::canny(gray, cfg.cannyLow, cfg.cannyHigh);
-    int w = gray.cols, h = gray.rows;
-    std::vector<unsigned char> seen(size_t(w) * h, 0);
-    std::vector<int> queue;
-    std::vector<Candidate> out;
-    for (int y = 1; y < h - 1; ++y)
-        for (int x = 1; x < w - 1; ++x) {
-            int start = y * w + x;
-            if (seen[start] || !edges.ptr<uchar>(y)[x])
-                continue;
-            queue.clear();
-            queue.push_back(start);
-            seen[start] = 1;
-            for (size_t k = 0; k < queue.size(); ++k) {
-                int px = queue[k] % w, py = queue[k] / w;
-                for (int dy = -1; dy <= 1; ++dy)
-                    for (int dx = -1; dx <= 1; ++dx) {
-                        int xx = px + dx, yy = py + dy;
-                        if (xx < 0 || xx >= w || yy < 0 || yy >= h)
-                            continue;
-                        int q = yy * w + xx;
-                        if (!seen[q] && edges.ptr<uchar>(yy)[xx]) {
-                            seen[q] = 1;
-                            queue.push_back(q);
-                        }
-                    }
-            }
-            if (queue.size() < 60)
-                continue;
-            Candidate c;
-            size_t stride = std::max(size_t(1), queue.size() / 2500);
-            for (size_t k = 0; k < queue.size(); k += stride)
-                c.pts.emplace_back(float(queue[k] % w), float(queue[k] / w));
-            try {
-                c.e = fitEllipse(c.pts);
-            } catch (const std::invalid_argument &) {
-                continue;
-            }
-            auto &e = c.e;
-            if (e.b < cfg.minRadiusFraction * std::min(w, h) || e.b / e.a < cfg.minAxisRatio)
-                continue;
-            double a = e.angleDeg * pi / 180, cs = std::cos(a), sn = std::sin(a);
-            double rx = std::hypot(e.a * cs, e.b * sn), ry = std::hypot(e.a * sn, e.b * cs);
-            if (e.center.x - rx < 1 || e.center.y - ry < 1 || e.center.x + rx > w - 2 ||
-                e.center.y + ry > h - 2)
-                continue;
-            std::array<bool, 36> sectors{};
-            double err = 0;
-            for (auto p : c.pts) {
-                double dx = p.x - e.center.x, dy = p.y - e.center.y;
-                double u = (cs * dx + sn * dy) / e.a, v = (-sn * dx + cs * dy) / e.b;
-                double d = std::abs(std::hypot(u, v) - 1);
-                err += d;
-                if (d < cfg.maxRelativeFitError * 2) {
-                    int bin = int((std::atan2(v, u) + pi) * 36 / (2 * pi));
-                    sectors[std::clamp(bin, 0, 35)] = true;
-                }
-            }
-            c.error = float(err / c.pts.size());
-            c.coverage = float(std::count(sectors.begin(), sectors.end(), true)) / 36;
-            if (c.coverage < cfg.minAngularCoverage || c.error > cfg.maxRelativeFitError)
-                continue;
-            c.score = c.coverage - 4 * c.error + 0.1f * e.b / std::min(w, h);
-            out.push_back(std::move(c));
-        }
-    std::sort(out.begin(), out.end(),
-              [](const Candidate &a, const Candidate &b) { return a.score > b.score; });
-    if (out.size() > 8)
-        out.resize(8);
-    return out;
+float residual(const Ellipse &e, cv::Point2f p) {
+    const double a = e.angleDeg * pi / 180, cs = std::cos(a), sn = std::sin(a);
+    const double dx = p.x - e.center.x, dy = p.y - e.center.y;
+    return float(std::abs(std::hypot((cs*dx + sn*dy)/e.a, (-sn*dx + cs*dy)/e.b) - 1));
 }
+std::string geometryRejection(const Ellipse &e, int w, int h, const NormalizeParams &cfg) {
+    if (!(e.a > 0) || !(e.b > 0) || !std::isfinite(e.center.x) || !std::isfinite(e.center.y))
+        return "invalid geometry";
+    if (e.b < cfg.minRadiusFraction * std::min(w,h)) return "too small";
+    if (e.b/e.a < cfg.minAxisRatio) return "axis ratio";
+    const double a=e.angleDeg*pi/180, cs=std::cos(a), sn=std::sin(a);
+    const double rx=std::hypot(e.a*cs,e.b*sn), ry=std::hypot(e.a*sn,e.b*cs);
+    if(e.center.x-rx<1 || e.center.y-ry<1 || e.center.x+rx>w-2 || e.center.y+ry>h-2)
+        return "outside image";
+    return {};
+}
+void measure(Candidate &c, const NormalizeParams &cfg, int imageShortSide) {
+    std::array<bool,36> sectors{};
+    double error=0;
+    const double a=c.e.angleDeg*pi/180,cs=std::cos(a),sn=std::sin(a);
+    for(auto p:c.pts) {
+        const double dx=p.x-c.e.center.x,dy=p.y-c.e.center.y;
+        const double u=(cs*dx+sn*dy)/c.e.a,v=(-sn*dx+cs*dy)/c.e.b;
+        const double d=std::abs(std::hypot(u,v)-1);
+        error+=d;
+        if(d<cfg.maxRelativeFitError*2) {
+            const int sector=int((std::atan2(v,u)+pi)*36/(2*pi));
+            sectors[std::clamp(sector,0,35)]=true;
+        }
+    }
+    c.error=float(error/c.pts.size());
+    c.coverage=float(std::count(sectors.begin(),sectors.end(),true))/36;
+    c.score=c.coverage-4*c.error+0.1f*c.e.b/imageShortSide-0.1f*(1-c.support);
+}
+std::string rejection(const Candidate &c, int w, int h, const NormalizeParams &cfg) {
+    auto reason=geometryRejection(c.e,w,h,cfg);
+    if(!reason.empty()) return reason;
+    if(c.coverage<cfg.minAngularCoverage) return "angular coverage";
+    if(c.error>cfg.maxRelativeFitError) return "fit error";
+    if(c.support<cfg.minInlierFraction) return "insufficient inlier fraction";
+    return {};
+}
+// Reproducible bounded RANSAC, local to one connected component. Refit consensus
+// using the unchanged least-squares solver; require support in the original pool.
+bool robustFit(const Candidate &source, int w, int h, const NormalizeParams &cfg, Candidate &best) {
+    unsigned state=0x9e3779b9u+unsigned(source.pts.size());
+    auto random=[&](){state^=state<<13;state^=state>>17;state^=state<<5;return state;};
+    float bestRank=-1;
+    for(int iteration=0;iteration<cfg.ransacIterations;++iteration) {
+        std::vector<cv::Point2f> samplePoints;
+        std::array<size_t,6> indices{};
+        for(size_t k=0;k<indices.size();++k) {
+            size_t index;
+            bool duplicate;
+            do {index=random()%source.pts.size(); duplicate=false;
+                for(size_t j=0;j<k;++j) duplicate=duplicate || indices[j]==index;
+            } while(duplicate);
+            indices[k]=index; samplePoints.push_back(source.pts[index]);
+        }
+        Ellipse e;
+        try {e=fitEllipse(samplePoints);} catch(const std::invalid_argument&){continue;}
+        if(!geometryRejection(e,w,h,cfg).empty()) continue;
+        Candidate c;
+        c.components=source.components;
+        c.method="RANSAC";
+        for(int refit=0;refit<3;++refit) {
+            c.pts.clear();
+            for(auto p:source.pts) if(residual(e,p)<=cfg.inlierTolerance) c.pts.push_back(p);
+            if(c.pts.size()<60 || c.pts.size()<cfg.minInlierFraction*source.pts.size()) break;
+            try {e=fitEllipse(c.pts);} catch(const std::invalid_argument&){c.pts.clear();break;}
+        }
+        if(c.pts.size()<60) continue;
+        c.e=e;
+        c.pts.clear();
+        for(auto p:source.pts) if(residual(e,p)<=cfg.inlierTolerance) c.pts.push_back(p);
+        if(c.pts.size()<60) continue;
+        c.support=float(c.pts.size())/source.pts.size();
+        measure(c,cfg,std::min(w,h));
+        if(!rejection(c,w,h,cfg).empty()) continue;
+        const float rank=c.score+0.1f*c.support;
+        if(rank>bestRank) {bestRank=rank;best=std::move(c);}
+    }
+    return bestRank>=0;
+}
+bool compatible(const Candidate &a,const Candidate &b,const NormalizeParams &cfg) {
+    return std::hypot(a.e.center.x-b.e.center.x,a.e.center.y-b.e.center.y)
+               <=cfg.arcCenterTolerance*std::max(a.e.a,b.e.a) &&
+           std::abs(a.e.a-b.e.a)<=cfg.arcAxisTolerance*std::max(a.e.a,b.e.a) &&
+           std::abs(a.e.b-b.e.b)<=cfg.arcAxisTolerance*std::max(a.e.b,b.e.b);
+}
+std::vector<Candidate> candidates(const cv::Mat &gray, const NormalizeParams &cfg,
+                                  CupDiagnostics *diagnostics=nullptr) {
+    auto edges=basic::canny(gray,cfg.cannyLow,cfg.cannyHigh);
+    if(diagnostics) {diagnostics->gray=gray;diagnostics->edges=edges;}
+    const int w=gray.cols,h=gray.rows;
+    std::vector<unsigned char> seen(size_t(w)*h,0);
+    std::vector<int> queue;
+    std::vector<Candidate> out,parts,robustPools;
+    auto record=[&](const Candidate &c,const std::string &method,const std::string &reason,
+                    const std::vector<cv::Point2f> &pool,bool fitted=true) {
+        if(!diagnostics) return;
+        RimCandidateDiagnostic d;
+        d.ellipse=c.e;d.points=pool;d.inliers=c.pts;d.components=c.components;
+        d.method=method;d.rejection=reason;d.coverage=c.coverage;d.fitError=c.error;
+        d.inlierFraction=c.support;d.score=c.score;d.accepted=reason.empty();d.fitted=fitted;
+        diagnostics->candidates.push_back(std::move(d));
+    };
+    int component=0;
+    for(int y=1;y<h-1;++y) for(int x=1;x<w-1;++x) {
+        const int start=y*w+x;
+        if(seen[start] || !edges.ptr<uchar>(y)[x]) continue;
+        queue={start};seen[start]=1;
+        for(size_t k=0;k<queue.size();++k) {
+            const int px=queue[k]%w,py=queue[k]/w;
+            for(int dy=-1;dy<=1;++dy) for(int dx=-1;dx<=1;++dx) {
+                const int xx=px+dx,yy=py+dy;
+                if(xx<0||yy<0||xx>=w||yy>=h) continue;
+                const int q=yy*w+xx;
+                if(!seen[q] && edges.ptr<uchar>(yy)[xx]) {seen[q]=1;queue.push_back(q);}
+            }
+        }
+        if(queue.size()<60) continue;
+        Candidate c;
+        c.components={++component};
+        const size_t stride=std::max(size_t(1),queue.size()/2500);
+        for(size_t k=0;k<queue.size();k+=stride) c.pts.emplace_back(float(queue[k]%w),float(queue[k]/w));
+        try {c.e=fitEllipse(c.pts);} catch(const std::invalid_argument&) {
+            record(c,"component","fit failed",c.pts,false);continue;
+        }
+        measure(c,cfg,std::min(w,h));
+        const auto reason=rejection(c,w,h,cfg);
+        record(c,"component",reason,c.pts);
+        if(reason.empty()) out.push_back(c);
+        if(!geometryRejection(c.e,w,h,cfg).empty()) continue;
+        if(c.coverage>=.15f && c.error<=cfg.maxRelativeFitError) parts.push_back(c);
+        if(c.error>cfg.maxRelativeFitError && c.pts.size()>=120) robustPools.push_back(std::move(c));
+    }
+    // Recovery must not displace an already valid original candidate. A more
+    // complete ceramic edge can outrank the liquid edge without being a better
+    // crop. Preserve the original successful path; recover only candidate absence.
+    if(!out.empty()) {
+        std::sort(out.begin(),out.end(),[](const Candidate&a,const Candidate&b){return a.score>b.score;});
+        if(out.size()>8) out.resize(8);
+        return out;
+    }
+    auto bySize=[](const Candidate&a,const Candidate&b){return a.pts.size()>b.pts.size();};
+    std::stable_sort(parts.begin(),parts.end(),bySize);
+    if(parts.size()>size_t(cfg.maxArcCandidates)) parts.resize(cfg.maxArcCandidates);
+    for(size_t i=0;i<parts.size();++i) {
+        Candidate group=parts[i];
+        for(size_t j=0;j<parts.size();++j) {
+            if(i==j || !compatible(parts[i],parts[j],cfg)) continue;
+            Candidate merged=group;
+            merged.method="merged arcs";
+            merged.pts.insert(merged.pts.end(),parts[j].pts.begin(),parts[j].pts.end());
+            merged.components.push_back(parts[j].components.front());
+            try {merged.e=fitEllipse(merged.pts);} catch(const std::invalid_argument&){continue;}
+            measure(merged,cfg,std::min(w,h));
+            if(!geometryRejection(merged.e,w,h,cfg).empty() || merged.error>cfg.maxRelativeFitError ||
+               merged.coverage<group.coverage+1.f/36-1e-6f) continue;
+            group=std::move(merged);
+            const auto reason=rejection(group,w,h,cfg);
+            record(group,"merged arcs",reason,group.pts);
+            if(reason.empty()) out.push_back(group);
+        }
+    }
+    std::stable_sort(robustPools.begin(),robustPools.end(),bySize);
+    if(robustPools.size()>16) robustPools.resize(16);
+    for(const auto &pool:robustPools) {
+        Candidate robust;
+        if(robustFit(pool,w,h,cfg,robust)) {
+            record(robust,"RANSAC",{},pool.pts);out.push_back(std::move(robust));
+        } else record(pool,"RANSAC","no supported ellipse",pool.pts);
+    }
+    std::stable_sort(out.begin(),out.end(),[](const Candidate&a,const Candidate&b){return a.score>b.score;});
+    std::vector<Candidate> unique;
+    for(auto &c:out) {
+        bool duplicate=false;
+        for(const auto &kept:unique) {
+            if(std::hypot(c.e.center.x-kept.e.center.x,c.e.center.y-kept.e.center.y)<.03f*kept.e.b &&
+               std::abs(c.e.a-kept.e.a)<.03f*kept.e.a && std::abs(c.e.b-kept.e.b)<.03f*kept.e.b)
+                duplicate=true;
+        }
+        if(!duplicate) unique.push_back(std::move(c));
+        if(unique.size()==8) break;
+    }
+    return unique;
+}
+
 std::pair<Ellipse, float> liquidBoundary(const cv::Mat &gray, const Ellipse &rim,
                                          const NormalizeParams &cfg) {
     float best = -std::numeric_limits<float>::infinity(), bestScale = 1;
@@ -207,6 +326,12 @@ void validate(const NormalizeParams &p) {
         !(p.liquidSearchMin > 0 && p.liquidSearchMax >= p.liquidSearchMin &&
           p.liquidSearchMax <= 1.2f) ||
         !(p.innerBoundarySupport > 0 && p.innerBoundarySupport <= 1) ||
+        !(p.arcCenterTolerance > 0 && p.arcCenterTolerance <= .5f) ||
+        !(p.arcAxisTolerance > 0 && p.arcAxisTolerance <= .5f) ||
+        p.maxArcCandidates < 2 || p.maxArcCandidates > 100 ||
+        p.ransacIterations < 0 || p.ransacIterations > 2000 ||
+        !(p.inlierTolerance > 0 && p.inlierTolerance <= p.maxRelativeFitError) ||
+        !(p.minInlierFraction >= .5f && p.minInlierFraction <= 1) ||
         !std::isfinite(p.textureWeight) || p.textureWeight < 0)
         throw std::invalid_argument("invalid NormalizeParams");
 }
@@ -263,7 +388,8 @@ std::vector<cv::Point2f> findRimPoints(const cv::Mat &gray) {
         throw std::runtime_error("컵 후보를 찾지 못했습니다.");
     return c.front().pts;
 }
-CupDetection detectCup(const cv::Mat &bgr, const NormalizeParams &cfg) {
+CupDetection detectCup(const cv::Mat &bgr, const NormalizeParams &cfg, CupDiagnostics *diagnostics) {
+    if (diagnostics) *diagnostics = CupDiagnostics();
     validate(cfg);
     if (bgr.empty() || bgr.type() != CV_8UC3)
         throw std::invalid_argument("detectCup: expected non-empty BGR image");
@@ -273,7 +399,8 @@ CupDetection detectCup(const cv::Mat &bgr, const NormalizeParams &cfg) {
         gray = basic::warpPerspective(
             gray, {1 / s, 0, 0, 0, 1 / s, 0, 0, 0, 1},
             {std::max(2, int(bgr.cols * s)), std::max(2, int(bgr.rows * s))});
-    auto list = candidates(gray, cfg);
+    if (diagnostics) diagnostics->detectionScale = float(s);
+    auto list = candidates(gray, cfg, diagnostics);
     if (list.empty())
         throw std::runtime_error("컵 후보를 찾지 못했습니다.");
     CupDetection result;
@@ -287,6 +414,8 @@ CupDetection detectCup(const cv::Mat &bgr, const NormalizeParams &cfg) {
             result.liquid = liquid.first;
             result.coverage = c.coverage;
             result.fitError = c.error;
+            result.rimMethod = c.method;
+            result.rimComponents = c.components;
         }
     }
     for (Ellipse *e : {&result.rim, &result.liquid}) {

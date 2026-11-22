@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cmath>
 #include <stdexcept>
+#include <fstream>
 #include "basic/color.h"
 #include "basic/edge.h"
 #include "basic/geometry.h"
@@ -107,6 +108,53 @@ int selfTest() {
     io::save("debug_normalize_synthetic_canon.png", cup.bgr);
     return 0;
 }
+void saveDiagnostics(const normalize::CupDiagnostics &diagnostics, const std::string &prefix) {
+    if(diagnostics.gray.empty()) return;
+    const int w=diagnostics.gray.cols,h=diagnostics.gray.rows;
+    cv::Mat edges(h,w,CV_8UC3),overlay(h,w,CV_8UC3);
+    for(int y=0;y<h;++y) for(int x=0;x<w;++x) for(int c=0;c<3;++c) {
+        edges.ptr<uchar>(y)[3*x+c]=diagnostics.edges.ptr<uchar>(y)[x];
+        overlay.ptr<uchar>(y)[3*x+c]=uchar(diagnostics.gray.ptr<float>(y)[x]*255);
+    }
+    io::save(prefix+"_edges.png",edges);
+    std::ofstream table(prefix+"_candidates.csv");
+    if(!table) throw std::runtime_error("cannot write candidate diagnostics");
+    table << "candidate,method,components,accepted,reason,fitted,center_x,center_y,a,b,coverage,error,inlier_fraction,score\n";
+    for(size_t i=0;i<diagnostics.candidates.size();++i) {
+        const auto &d=diagnostics.candidates[i];
+        table << i << ',' << d.method << ',';
+        for(size_t j=0;j<d.components.size();++j) {if(j) table << ';';table << d.components[j];}
+        table << ',' << d.accepted << ',' << d.rejection << ',' << d.fitted << ','
+              << d.ellipse.center.x << ',' << d.ellipse.center.y << ',' << d.ellipse.a << ',' << d.ellipse.b
+              << ',' << d.coverage << ',' << d.fitError << ',' << d.inlierFraction << ',' << d.score << '\n';
+        for(auto p:d.points) {
+            int x=int(std::lround(p.x)),y=int(std::lround(p.y));
+            if(x>=0&&y>=0&&x<w&&y<h) {
+                auto pixel=overlay.ptr<uchar>(y)+3*x;
+                pixel[0]=0;pixel[1]=d.accepted?180:40;pixel[2]=d.accepted?0:255;
+            }
+        }
+    }
+    io::save(prefix+"_candidates.png",overlay);
+    // Separate accepted fits so a rejected connected component cannot hide the
+    // consensus points that rescued it. Yellow = excluded, green = selected points.
+    cv::Mat consensus(h,w,CV_8UC3);
+    for(int y=0;y<h;++y) for(int x=0;x<w;++x) for(int c=0;c<3;++c)
+        consensus.ptr<uchar>(y)[3*x+c]=uchar(diagnostics.gray.ptr<float>(y)[x]*255);
+    for(const auto &d:diagnostics.candidates) if(d.accepted) {
+        for(auto p:d.points) {
+            auto pixel=consensus.ptr<uchar>(int(p.y))+3*int(p.x);
+            pixel[0]=0;pixel[1]=220;pixel[2]=255;
+        }
+        for(auto p:d.inliers) {
+            auto pixel=consensus.ptr<uchar>(int(p.y))+3*int(p.x);
+            pixel[0]=0;pixel[1]=220;pixel[2]=0;
+        }
+    }
+    io::save(prefix+"_inliers.png",consensus);
+    if(!table) throw std::runtime_error("candidate diagnostics write failed");
+}
+
 float number(const std::string &value) {
     size_t used = 0;
     float v = std::stof(value, &used);
@@ -119,17 +167,20 @@ int runNormalize(const Args &args) {
     if (args.empty()) {
         std::printf(
             "usage: --debug normalize <photo> [--texture-weight=0.25] [--glcm-radius=3] "
-            "[--canny-low=0.05] [--canny-high=0.15]\n       --debug normalize --self-test\n");
+            "[--canny-low=0.05] [--canny-high=0.15] [--ransac-iterations=300] "
+            "[--prefix=debug_normalize]\n       --debug normalize --self-test\n");
         return 1;
     }
     if (args[0] == "--self-test")
         return selfTest();
     normalize::NormalizeParams p;
+    std::string prefix="debug_normalize";
     for (size_t i = 1; i < args.size(); ++i) {
         auto eq = args[i].find('=');
         if (eq == std::string::npos)
             throw std::invalid_argument("expected --option=value");
         auto key = args[i].substr(0, eq);
+        if (key == "--prefix") { prefix=args[i].substr(eq+1); continue; }
         float v = number(args[i].substr(eq + 1));
         if (key == "--texture-weight")
             p.textureWeight = v;
@@ -143,15 +194,19 @@ int runNormalize(const Args &args) {
             p.cannyLow = v;
         else if (key == "--canny-high")
             p.cannyHigh = v;
+        else if (key == "--ransac-iterations")
+            p.ransacIterations = int(v);
         else if (key == "--min-axis-ratio")
             p.minAxisRatio = v;
         else
             throw std::invalid_argument("unknown normalize option: " + key);
     }
     auto bgr = io::loadColor(args[0]);
-    auto d = normalize::detectCup(bgr, p);
-    auto edges = basic::canny(basic::bgrToGray(bgr), p.cannyLow, p.cannyHigh);
-    io::save("debug_normalize_edges.png", edges);
+    normalize::CupDiagnostics diagnostics;
+    normalize::CupDetection d;
+    try { d=normalize::detectCup(bgr,p,&diagnostics); }
+    catch(...) {saveDiagnostics(diagnostics,prefix);throw;}
+    saveDiagnostics(diagnostics,prefix);
     // Own raster overlay, independent of unfinished viz/draw.
     auto overlay = bgr.clone();
     auto draw = [&](const normalize::Ellipse &e, int channel) {
@@ -167,14 +222,16 @@ int runNormalize(const Args &args) {
     };
     draw(d.rim, 2);
     draw(d.liquid, 1);
-    io::save("debug_normalize_boundaries.png", overlay);
+    io::save(prefix+"_boundaries.png", overlay);
     auto cup = normalize::normalizeCup(bgr, p);
-    io::save("debug_normalize_cup.png", cup.bgr);
-    io::save("debug_normalize_mask.png", cup.cupMask);
+    io::save(prefix+"_cup.png", cup.bgr);
+    io::save(prefix+"_mask.png", cup.cupMask);
     std::printf("liquid center %.2f %.2f, axes %.2f %.2f, coverage %.3f, fit error %.4f\n",
                 d.liquid.center.x, d.liquid.center.y, d.liquid.a, d.liquid.b, d.coverage,
                 d.fitError);
-    std::printf("saved debug_normalize_*.png (rim red, liquid green)\n");
+    std::printf("selected rim: %s; components:", d.rimMethod.c_str());
+    for(int id:d.rimComponents) std::printf(" %d",id);
+    std::printf("\nsaved %s diagnostics (rim red, liquid green)\n",prefix.c_str());
     return 0;
 }
 } // namespace la::debug

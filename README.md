@@ -43,6 +43,23 @@ aligned user cups above separate vertical/horizontal structure diagrams: green m
 red means a missing reference peak, and yellow means an extra user peak.
 The optional old `tulip:3` syntax is still accepted; `3` is catalog metadata only.
 Cup detection and size failures stop scoring and report the stage and error.
+When no original rim candidate passes validation, normalization tries compatible
+edge-arc merging and bounded, reproducible RANSAC consensus fitting. The size,
+axis ratio, image containment and angular coverage checks remain in force.
+Existing successful rim candidates retain priority. This recovers candidate absence;
+it does not guarantee a correct liquid boundary for every cup material or reflection.
+
+```powershell
+bin\Release\LatteArt.exe --debug normalize photo.png --prefix=data/raw/cup-test
+powershell -ExecutionPolicy Bypass -File scripts/test_cup_recovery.ps1
+```
+The debug command saves the actual resized detection edges, candidate CSV with
+rejection reasons, candidate/inlier overlays, and (on success) final boundaries
+and normalized cup. Red boundary = rim, green = liquid. Inlier diagnostics use
+green for accepted support and yellow for excluded points. Candidate diagnostics
+are still saved on detection failure. `--ransac-iterations=0` disables consensus
+fitting for comparison; arc merging remains enabled. Recovery tests use the tracked
+`Tulip_Practice_10.png`; generated outputs remain under ignored `data/raw/`.
 
 Batch input uses UTF-8 CSV with `file,pattern,reference,notes` columns (`notes` is optional).
 User file paths are relative to `<photo_dir>`; reference paths are relative to the
@@ -65,7 +82,7 @@ Image summaries include `vertical_lines`, `horizontal_lines`, `vertical_score`,
 
 Final score = (mean vertical line score + mean horizontal line score) / 2.
 The directions always have equal weight, even with different numbers of valid lines.
-Each line retains the count-error band and 50% spacing/thickness U, 50% quality Q
+Each line retains the count-error band and 30% spacing/thickness U, 70% quality Q
 formula. Rotation search also uses the equal directional mean of structure-only
 scores; quality is evaluated once at the selected rotation. Both directions are required.
 

@@ -24,12 +24,33 @@ struct NormalizeParams {
     float textureWeight = 0.25f;
     float innerBoundarySupport = 0.85f; // minimum evidence relative to the strongest rim transition
     float liquidSearchMin = 0.78f, liquidSearchMax = 1.02f;
+    float arcCenterTolerance = 0.15f, arcAxisTolerance = 0.20f;
+    int maxArcCandidates = 48;
+    int ransacIterations = 300;
+    float inlierTolerance = 0.025f, minInlierFraction = 0.60f;
+};
+// Diagnostic geometry/points use the resized detection image coordinates.
+struct RimCandidateDiagnostic {
+    Ellipse ellipse;
+    std::vector<cv::Point2f> points, inliers;
+    std::vector<int> components;
+    std::string method, rejection;
+    float coverage = 0, fitError = 0, inlierFraction = 0, score = 0;
+    bool fitted = false, accepted = false;
+};
+struct CupDiagnostics {
+    cv::Mat gray, edges;
+    std::vector<RimCandidateDiagnostic> candidates;
+    float detectionScale = 1;
 };
 struct CupDetection {
     Ellipse rim, liquid; // input image coordinates
     float coverage = 0, fitError = 0;
+    std::string rimMethod;
+    std::vector<int> rimComponents;
 };
-CupDetection detectCup(const cv::Mat &bgr, const NormalizeParams &params = NormalizeParams());
+CupDetection detectCup(const cv::Mat &bgr, const NormalizeParams &params = NormalizeParams(),
+                       CupDiagnostics *diagnostics = nullptr);
 
 // Normalized algebraic least-squares conic fit with ellipse validation.
 // Not the generalized-eigensystem Fitzgibbon implementation.
