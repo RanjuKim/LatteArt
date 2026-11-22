@@ -216,7 +216,7 @@ StructureComparison compareFrames(const Frame &ref, const Frame &user, float ang
             if (r.peaks.empty() && u.peaks.empty()) {
                 line.U = 0;
                 line.bandLow = 0;
-                line.bandHigh = 29;
+                line.bandHigh = 0;
             }
             out.lines.push_back(std::move(line));
         }
@@ -392,13 +392,19 @@ LineComparison matchLayers(const std::vector<Peak> &ref, const std::vector<Peak>
         }
     }
     std::reverse(out.matches.begin(), out.matches.end());
-    // Equal counts can still contain a missing layer plus an extra unrelated layer.
-    auto band = scoring::bandFor(std::max(out.missing, out.extra));
-    out.bandLow = band.low;
-    out.bandHigh = band.high;
+    // Count agreement determines the bounds; correspondence determines U.
+    // Empty detections are not evidence of a successful structure match.
+    const int referenceCount = static_cast<int>(ref.size());
+    const int userCount = static_cast<int>(user.size());
+    const int largerCount = std::max(referenceCount, userCount);
+    const float countSimilarity = largerCount > 0
+        ? static_cast<float>(std::min(referenceCount, userCount)) /
+              static_cast<float>(largerCount)
+        : 0.f;
+    out.bandLow = 60.f * countSimilarity;
+    out.bandHigh = 100.f * countSimilarity;
     if (out.matches.empty()) {
-        out.bandLow = 0;
-        out.bandHigh = 29;
+        // Keep count-based bounds; no correspondence leaves U at zero.
         return out;
     }
     for (auto a : out.matches)

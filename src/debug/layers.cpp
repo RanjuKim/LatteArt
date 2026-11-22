@@ -108,16 +108,38 @@ int selfTest() {
     check(missing.missing == 1 && missing.extra == 0 && missing.matches.size() == 3 &&
               missing.matches[1].reference == 2,
           "middle missing layer does not shift correspondence");
-    check(missing.spacingScore > .999f && missing.bandHigh == 59,
+    check(missing.spacingScore > .999f && missing.bandLow == 45 && missing.bandHigh == 75,
           "skip gap compares same endpoints and preserves count penalty");
     auto extra = matchLayers({{.2f, .05f}, {.6f, .05f}, {.8f, .05f}}, ref, p);
     check(extra.extra == 1 && extra.missing == 0, "extra layer penalty");
     auto replaced = matchLayers({{.2f, .05f}, {.4f, .05f}},
                                 {{.2f, .05f}, {.9f, .05f}}, p);
     check(replaced.reference.size() == replaced.user.size() &&
-              replaced.missing == 1 && replaced.extra == 1 && replaced.bandHigh == 59,
+              replaced.missing == 1 && replaced.extra == 1 && replaced.bandHigh == 100,
           "equal counts retain missing and extra layers in shared result");
     StructureComparison shared;
+    // Count penalties are proportional rather than absolute-error buckets.
+    std::vector<Peak> ten;
+    for (int i = 0; i < 10; ++i) ten.push_back({.05f + .1f * i, .02f});
+    const auto nine = matchLayers(ten, std::vector<Peak>(ten.begin(), ten.end() - 1), p);
+    const auto eight = matchLayers(ten, std::vector<Peak>(ten.begin(), ten.end() - 2), p);
+    const auto one = matchLayers(ten, {ten.front()}, p);
+    check(std::abs(nine.bandLow - 54) < .001f && std::abs(nine.bandHigh - 90) < .001f &&
+              std::abs(eight.bandHigh - 80) < .001f && std::abs(one.bandLow - 6) < .001f &&
+              std::abs(one.bandHigh - 10) < .001f &&
+              scoring::computeLineScore(nine, 1) > scoring::computeLineScore(eight, 1) &&
+              scoring::computeLineScore(eight, 1) > scoring::computeLineScore(one, 1),
+          "10-to-9, 10-to-8 and 10-to-1 count differences receive graduated scores");
+    const auto none = matchLayers({}, {}, p);
+    const auto absentLine = matchLayers(ten, {}, p);
+    check(scoring::computeLineScore(none, 1) == 0 &&
+              scoring::computeLineScore(absentLine, 1) == 0,
+          "empty detections and one-sided missing structure cannot earn quality-only points");
+    const auto unpaired = matchLayers({{.1f, .02f}}, {{.9f, .02f}}, p);
+    check(unpaired.matches.empty() && unpaired.U == 0 && unpaired.bandLow == 60 &&
+              unpaired.bandHigh == 100 && scoring::computeLineScore(unpaired, 1) == 80 &&
+              scoring::computeLineScore(unpaired, 1) < scoring::computeLineScore(same, 1),
+          "unpaired equal counts keep count bounds but lose correspondence credit");
     shared.sizeOk = true;
     shared.lines = {same, missing, extra, replaced};
     shared.lines[0].coordinate = .1f;
@@ -146,9 +168,9 @@ int selfTest() {
               delivered.lines[1].matches[1].reference == 2,
           "shared result preserves per-line counts, coordinates and skipped-layer matches");
     const auto mixedScore = scoring::computeScore(delivered, 1);
-    check(std::abs(mixedScore.vertical.finalScore - 69.25f) < .01f &&
+    check(std::abs(mixedScore.vertical.finalScore - 87.5f) < .01f &&
               std::abs(mixedScore.horizontal.finalScore - 100) < .01f &&
-              std::abs(mixedScore.finalScore - 84.625f) < .01f,
+              std::abs(mixedScore.finalScore - 93.75f) < .01f,
           "unequal direction counts still receive 50/50 weight");
     auto incomplete = shared;
     incomplete.lines.pop_back();

@@ -1,7 +1,7 @@
 // Owner: Jaeku Kang
-// Structure-first banded scoring:
-//   S = L(dn) + [H(dn) - L(dn)] * (alpha U + (1-alpha) Q)
-//   dn = 0 -> 60..100,  dn = 1 -> 30..59,  dn >= 2 -> 0..29
+// Count-ratio scoring: C = min(reference count, user count) / max(counts).
+// Empty detections use C=0. Line bounds are L=60*C, H=100*C.
+// S = L + (H-L) * (alpha U + (1-alpha) Q).
 #pragma once
 #include "core/types.h"
 
@@ -13,6 +13,7 @@ struct Band {
     float low, high;
 };
 
+// Legacy absolute-error bands, retained for source compatibility only.
 Band bandFor(int deltaN);
 
 // Shared by final scoring, console output and CSV export to keep the formula identical.
