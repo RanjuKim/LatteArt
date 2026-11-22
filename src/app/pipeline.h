@@ -13,12 +13,9 @@ namespace la::app {
 struct PipelineResult {
     NormalizedCup ref, user;
     PatternMask refMask, userMask;
-    // Legacy report/batch bridge: count/fftCount=-1 means unavailable, not a detected count.
-    // Consumers should migrate to structure.lines instead of inventing a global count.
-    LayerResult refLayers, userLayers;
     QualityResult quality;
     ScoreResult score;
-    structure::StructureComparison structure;
+    StructureComparison structure; // authoritative shared multi-line result
 };
 
 struct PipelineParams {
@@ -35,6 +32,7 @@ PipelineResult runPipeline(const cv::Mat &refBgr, const cv::Mat &userBgr, const 
 
 // `stage` (optional) is updated before each step so callers can report where
 // an exception came from.
+// PatternSpec is catalog metadata only; targetLayers does not affect scoring.
 PipelineResult runPipeline(const cv::Mat &refBgr, const cv::Mat &userBgr, const PatternSpec &spec,
                            std::string *stage = nullptr);
 

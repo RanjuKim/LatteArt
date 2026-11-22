@@ -33,17 +33,11 @@ PipelineResult scoreNormalized(const NormalizedCup &ref, const NormalizedCup &us
     r.quality = quality::evaluateQuality(r.user, r.userMask, r.ref, r.refMask);
     at("multi-line scoring");
     r.score = scoring::computeScore(r.structure, r.quality.Q);
-    // SHARED/report/batch still expect one count. Do not invent one from scanlines.
-    // Consumers must migrate to PipelineResult.structure; debug layers already uses it.
-    r.refLayers.count = r.userLayers.count = -1;
-    r.refLayers.fftCount = r.userLayers.fftCount = -1;
-    r.refLayers.U = r.userLayers.U = r.score.U;
     return r;
 }
 PipelineResult runPipeline(const cv::Mat &refBgr, const cv::Mat &userBgr, const PatternSpec &spec,
                            const PipelineParams &params, std::string *stage) {
-    if (spec.targetLayers <= 0)
-        throw std::invalid_argument("positive targetLayers required");
+    (void)spec; // Catalog metadata only: the reference image defines the target.
     if (stage)
         *stage = "normalize reference";
     auto ref = normalize::normalizeCup(refBgr, params.normalize);

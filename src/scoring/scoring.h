@@ -1,12 +1,13 @@
 // Owner: Jaeku Kang
 // Structure-first banded scoring:
-//   S = L(dn) + [H(dn) - L(dn)] * (0.3 U + 0.7 Q)
+//   S = L(dn) + [H(dn) - L(dn)] * (alpha U + (1-alpha) Q)
 //   dn = 0 -> 60..100,  dn = 1 -> 30..59,  dn >= 2 -> 0..29
 #pragma once
 #include "core/types.h"
-#include "structure/layers.h"
 
 namespace la::scoring {
+
+constexpr float kStructureWeight = 0.5f;
 
 struct Band {
     float low, high;
@@ -14,10 +15,13 @@ struct Band {
 
 Band bandFor(int deltaN);
 
-ScoreResult computeScore(const LayerResult &layers, int targetLayers, float Q);
+// Shared by final scoring, console output and CSV export to keep the formula identical.
+float computeLineScore(const LineComparison &line, float Q);
+DirectionScore summarizeDirection(const StructureComparison &structure,
+                                  ScanDirection direction, float Q);
 
-// Mean of per-line banded scores. Q is measured once on the original-size cups.
-// deltaN=-1 explicitly means no single image-level count error is defined.
-ScoreResult computeScore(const structure::StructureComparison &structure, float Q);
+// Equal mean of vertical/horizontal direction scores. Both directions required.
+// Q is measured once on the original-size cups at the selected rotation.
+ScoreResult computeScore(const StructureComparison &structure, float Q);
 
 } // namespace la::scoring
