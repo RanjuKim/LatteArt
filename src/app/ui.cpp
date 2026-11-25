@@ -454,7 +454,7 @@ cv::Mat resultScreen(const Case& c, int index, int count, const Outcome& o, int 
         if (tab == 0) overview(img, o);
         else if (tab == 1) structureTab(img, o);
         else qualityTab(img, o);
-        footer(img, "1/2/3 TAB VIEW   A/D PREV/NEXT   S SAVE   B BACK   Q QUIT", status);
+        footer(img, "1/2/3 TAB VIEW   S SAVE   B BACK   Q QUIT", status);
     } else {
         // Text column ends before the photo at x = 760 (12 px per character).
         int y = 150;
@@ -464,7 +464,7 @@ cv::Mat resultScreen(const Case& c, int index, int count, const Outcome& o, int 
         y += 20;
         text(img, 40, y, "STEP: " + o.stage, kDim);
         picture(img, loadOrEmpty(c.user), 760, 140, 380, 380);
-        footer(img, "A/D PREV/NEXT   B BACK   Q QUIT", status);
+        footer(img, "B BACK   Q QUIT", status);
     }
     return img;
 }
@@ -618,12 +618,9 @@ int runUi(const char* exePath, int argc, char** argv) {
                 else status = "CANCELLED";
             }
         } else {
-            const int n = int(cases.size());
             if (key == 'b' || key == 8 || key == 27) { screen = Screen::Menu; if (current >= 0) sel = current; }
             else if (key >= '1' && key <= '3' && outcome.ok) tab = key - '1';
             else if (key == 9 && outcome.ok) tab = (tab + 1) % 3;
-            else if (key == 'd' && current >= 0 && n) { sel = (current + 1) % n; run(sel, cases[sel]); }
-            else if (key == 'a' && current >= 0 && n) { sel = (current + n - 1) % n; run(sel, cases[sel]); }
             else if (key == 'f' && outcome.ok) io::show("LatteArt - full result", outcome.render);
             else if (key == 's') {
                 const std::string name = "latteart_screen_" + std::to_string(++saved) + ".png";
