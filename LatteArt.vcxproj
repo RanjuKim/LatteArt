@@ -75,6 +75,7 @@
   <ItemGroup>
     <ClInclude Include="src\app\batch.h" />
     <ClInclude Include="src\app\pipeline.h" />
+    <ClInclude Include="src\app\ui.h" />
     <ClInclude Include="src\basic\clahe.h" />
     <ClInclude Include="src\basic\color.h" />
     <ClInclude Include="src\basic\edge.h" />
@@ -100,6 +101,7 @@
     <ClCompile Include="src\app\batch.cpp" />
     <ClCompile Include="src\app\main.cpp" />
     <ClCompile Include="src\app\pipeline.cpp" />
+    <ClCompile Include="src\app\ui.cpp" />
     <ClCompile Include="src\basic\clahe.cpp" />
     <ClCompile Include="src\basic\color.cpp" />
     <ClCompile Include="src\basic\edge.cpp" />

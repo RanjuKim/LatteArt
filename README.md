@@ -32,6 +32,8 @@ structure first (per-line layer correspondence, spacing and thickness), then qua
 
 ## Run
 ```
+bin\Release\LatteArt.exe                                                # keyboard viewer (also: double-click, Ctrl+F5, --ui)
+bin\Release\LatteArt.exe --ui --snapshot shots                         # save every viewer screen as PNG, no window
 bin\Release\LatteArt.exe data\reference\tulip3.jpg data\user\tulip3_junkyu_01.jpg tulip result.png
 bin\Release\LatteArt.exe reference.png user.png tulip result.png --no-show  # save without opening a window
 bin\Release\LatteArt.exe --canon photo.jpg <cx> <cy> <r> canon.png     # manual normalization to 512x512
