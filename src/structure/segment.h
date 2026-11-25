@@ -12,6 +12,7 @@ struct FoamEvidence {
     float michelson = 0.f;          // (foam - crema) / (foam + crema)
     float edgeWidth = 0.f;          // px over which the boundary between them changes
     float chromaRatio = 0.f;        // chroma of the bright class / dark class (foam is whiter: < 1)
+    bool colorChecked = false;      // false: crema nearly neutral (e.g. grayscale), ratio not used
     bool hasFoam = false;
 };
 

@@ -40,6 +40,13 @@ constexpr float kRimShare = 0.6f;       // blob with > 60% of its pixels in the 
 // edge width alone cannot tell it from a blurry photo; the color can.
 constexpr float kMinMichelson = 0.06f;
 constexpr float kMaxChromaRatio = 0.9f;
+// The color check needs a colored crema to compare with. If the crema is
+// nearly neutral (grayscale photo, synthetic test image), both chromas are
+// ~0 and their ratio is noise (an achromatic test cup gave 2.20 and was
+// rejected), so the check is skipped and brightness + edge width decide.
+// Limit: in a grayscale photo a lighting gradient on plain crema is then not
+// caught by color. Real crema chroma is far above this.
+constexpr float kMinCremaChroma = 5.f;  // Lab units
 constexpr float kMaxEdgeWidth = 16.f;
 constexpr int kEdgeKeepOut = 3;  // px: boundary this close to the inner cup edge is the cup cut
 
@@ -121,10 +128,11 @@ FoamEvidence measureFoam(const NormalizedCup& cup, const cv::Mat& blurred, const
             }
         const float cf = meanWhere(chroma, inner, bin, true), cc = meanWhere(chroma, inner, bin, false);
         ev.chromaRatio = cc > 1e-6f ? cf / cc : (cf > 1e-6f ? std::numeric_limits<float>::infinity() : 0.f);
+        ev.colorChecked = cc >= kMinCremaChroma;
     }
 
-    ev.hasFoam = ev.michelson >= kMinMichelson && ev.chromaRatio <= kMaxChromaRatio &&
-                 ev.edgeWidth <= kMaxEdgeWidth;
+    const bool colorOk = !ev.colorChecked || ev.chromaRatio <= kMaxChromaRatio;
+    ev.hasFoam = ev.michelson >= kMinMichelson && colorOk && ev.edgeWidth <= kMaxEdgeWidth;
     return ev;
 }
 
