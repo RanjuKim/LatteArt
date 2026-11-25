@@ -56,23 +56,12 @@ struct Case {
 std::vector<Case> demoCases(const fs::path& demo) {
     const struct { const char *group, *ref, *user, *pattern; } list[] = {
         {"1_high_score", "Pro_Tulip_3.png", "Pro_Tulip_3__scale90.png", "tulip"},
-        {"1_high_score", "Pro_Heart_3.png", "Pro_Heart_3__rot10.png", "heart"},
-        {"1_high_score", "Pro_Tulip_4.png", "Pro_Tulip_4__scale90.png", "tulip"},
         {"1_high_score", "Pro_Heart_3.png", "Pro_Heart_3__dark.png", "heart"},
-        {"1_high_score", "Pro_Tulip_3.png", "Pro_Tulip_3__rot10.png", "tulip"},
-        {"2_layers_merged", "Pro_Tulip_4.png", "Pro_Tulip_4__thick.png", "tulip"},
         {"3_practice_good", "Pro_Tulip_3.png", "Tulip_Practice_11.png", "tulip"},
-        {"3_practice_good", "Pro_Tulip_3.png", "Tulip_Practice_18.png", "tulip"},
-        {"3_practice_good", "Pro_Heart_3.png", "Heart_Practice_18.png", "heart"},
-        {"3_practice_good", "Pro_Tulip_3.png", "Tulip_Practice_9.png", "tulip"},
-        {"3_practice_good", "Pro_Heart_3.png", "Heart_Practice_14.png", "heart"},
         {"4_practice_bad", "Pro_Tulip_1.png", "Tulip_Practice_6.png", "tulip"},
-        {"4_practice_bad", "Pro_Tulip_1.png", "Tulip_Practice_8.png", "tulip"},
         {"4_practice_bad", "Pro_Heart_3.png", "Heart_Practice_6.png", "heart"},
         {"5_should_fail", "Pro_Heart_3.png", "no_cup_gray.png", "heart"},
-        {"5_should_fail", "Pro_Tulip_3.png", "Tulip_Practice_1.png", "tulip"},
         {"5_should_fail", "Pro_Heart_3.png", "Heart_Practice_21.png", "heart"},
-        {"5_should_fail", "Pro_Heart_3.png", "Heart_Practice_5.png", "heart"},
     };
     std::vector<Case> cases;
     for (const auto& c : list)
@@ -541,14 +530,20 @@ int snapshot(const std::vector<Case>& cases, const fs::path& dir) {
         std::printf("saved %s\n", (dir / name).string().c_str());
     };
     if (cases.empty()) throw std::runtime_error("demo_samples not found");
-    const int ok = 1, fail = std::min(14, int(cases.size()) - 1);
+    // First case of a demo folder (falls back to the first case).
+    auto first = [&](const char* group) {
+        for (int i = 0; i < int(cases.size()); ++i)
+            if (cases[i].group == group) return i;
+        return 0;
+    };
+    const int n = int(cases.size());
+    const int ok = first("1_high_score"), poor = first("4_practice_bad"), fail = first("5_should_fail");
     save("ui_menu.png", menuScreen(cases, ok, loadOrEmpty(cases[ok].ref), loadOrEmpty(cases[ok].user), ""));
     const Outcome o = score(cases[ok]);
     for (int tab = 0; tab < 3; ++tab)
-        save("ui_result_" + std::to_string(tab + 1) + ".png", resultScreen(cases[ok], ok, int(cases.size()), o, tab, ""));
-    save("ui_error.png", resultScreen(cases[fail], fail, int(cases.size()), score(cases[fail]), 0, ""));
-    const int poor = std::min(11, int(cases.size()) - 1);  // a poorly made practice cup
-    save("ui_result_poor.png", resultScreen(cases[poor], poor, int(cases.size()), score(cases[poor]), 0, ""));
+        save("ui_result_" + std::to_string(tab + 1) + ".png", resultScreen(cases[ok], ok, n, o, tab, ""));
+    save("ui_error.png", resultScreen(cases[fail], fail, n, score(cases[fail]), 0, ""));
+    save("ui_result_poor.png", resultScreen(cases[poor], poor, n, score(cases[poor]), 0, ""));
     return o.ok ? 0 : 2;
 }
 
