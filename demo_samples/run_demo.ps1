@@ -8,23 +8,12 @@ if (-not (Test-Path $exe)) { Write-Output 'Build Release x64 first.'; exit 1 }
 
 $cases = @(
     @('1 high', 'reference\Pro_Tulip_3.png', '1_high_score\Pro_Tulip_3__scale90.png', 'tulip'),
-    @('1 high', 'reference\Pro_Heart_3.png', '1_high_score\Pro_Heart_3__rot10.png', 'heart'),
-    @('1 high', 'reference\Pro_Tulip_4.png', '1_high_score\Pro_Tulip_4__scale90.png', 'tulip'),
     @('1 high', 'reference\Pro_Heart_3.png', '1_high_score\Pro_Heart_3__dark.png', 'heart'),
-    @('1 high', 'reference\Pro_Tulip_3.png', '1_high_score\Pro_Tulip_3__rot10.png', 'tulip'),
-    @('2 merged', 'reference\Pro_Tulip_4.png', '2_layers_merged\Pro_Tulip_4__thick.png', 'tulip'),
     @('3 good', 'reference\Pro_Tulip_3.png', '3_practice_good\Tulip_Practice_11.png', 'tulip'),
-    @('3 good', 'reference\Pro_Tulip_3.png', '3_practice_good\Tulip_Practice_18.png', 'tulip'),
-    @('3 good', 'reference\Pro_Heart_3.png', '3_practice_good\Heart_Practice_18.png', 'heart'),
-    @('3 good', 'reference\Pro_Tulip_3.png', '3_practice_good\Tulip_Practice_9.png', 'tulip'),
-    @('3 good', 'reference\Pro_Heart_3.png', '3_practice_good\Heart_Practice_14.png', 'heart'),
     @('4 bad', 'reference\Pro_Tulip_1.png', '4_practice_bad\Tulip_Practice_6.png', 'tulip'),
-    @('4 bad', 'reference\Pro_Tulip_1.png', '4_practice_bad\Tulip_Practice_8.png', 'tulip'),
     @('4 bad', 'reference\Pro_Heart_3.png', '4_practice_bad\Heart_Practice_6.png', 'heart'),
     @('5 fail', 'reference\Pro_Heart_3.png', '5_should_fail\no_cup_gray.png', 'heart'),
-    @('5 fail', 'reference\Pro_Tulip_3.png', '5_should_fail\Tulip_Practice_1.png', 'tulip'),
-    @('5 fail', 'reference\Pro_Heart_3.png', '5_should_fail\Heart_Practice_21.png', 'heart'),
-    @('5 fail', 'reference\Pro_Heart_3.png', '5_should_fail\Heart_Practice_5.png', 'heart')
+    @('5 fail', 'reference\Pro_Heart_3.png', '5_should_fail\Heart_Practice_21.png', 'heart')
 )
 
 foreach ($c in $cases) {
