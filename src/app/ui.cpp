@@ -9,7 +9,7 @@
 #include <cstdio>
 #include <exception>
 #include <filesystem>
-#include <iostream>
+#include <iterator>
 #include <map>
 #include <stdexcept>
 #include <string>
@@ -19,6 +19,14 @@
 #include "io/io.h"
 #include "viz/draw.h"
 #include "viz/report.h"
+
+// Windows standard "Open" dialog for choosing your own photos (GUI only,
+// not part of the image processing).
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <commdlg.h>
+#pragma comment(lib, "comdlg32.lib")
 
 namespace fs = std::filesystem;
 
@@ -40,29 +48,10 @@ const viz::Color kGood{80, 200, 90}, kWarn{40, 200, 235}, kBad{70, 70, 230};
 // ---------------------------------------------------------------------------
 // Demo cases: the same list as demo_samples/run_demo.ps1.
 struct Case {
-    std::string group;    // folder name, e.g. 1_high_score
-    std::string ref, user, pattern;
+    std::string group;    // folder name, e.g. 1_high_score ("own" for chosen photos)
+    fs::path ref, user;   // fs::path so folders with Korean letters work
+    std::string pattern;
 };
-
-struct Group {
-    const char* folder;
-    const char* tag;          // short label in the list
-    const char* description;  // shown under the preview
-};
-const Group kGroups[] = {
-    {"1_high_score", "SAME", "SAME ART: EDITED COPY OF THE REFERENCE"},
-    {"2_layers_merged", "MERGED", "LAYERS MERGED: FOAM MADE THICKER"},
-    {"3_practice_good", "GOOD", "PRACTICE CUP: WELL MADE"},
-    {"4_practice_bad", "POOR", "PRACTICE CUP: POORLY MADE"},
-    {"5_should_fail", "FAIL", "SHOULD FAIL: SHOWS A CLEAR ERROR MESSAGE"},
-    {"own", "OWN", "YOUR OWN PHOTOS"},
-};
-
-const Group& groupOf(const std::string& folder) {
-    for (const Group& g : kGroups)
-        if (folder == g.folder) return g;
-    return kGroups[5];
-}
 
 std::vector<Case> demoCases(const fs::path& demo) {
     const struct { const char *group, *ref, *user, *pattern; } list[] = {
@@ -87,8 +76,7 @@ std::vector<Case> demoCases(const fs::path& demo) {
     };
     std::vector<Case> cases;
     for (const auto& c : list)
-        cases.push_back({c.group, (demo / "reference" / c.ref).string(),
-                         (demo / c.group / c.user).string(), c.pattern});
+        cases.push_back({c.group, demo / "reference" / c.ref, demo / c.group / c.user, c.pattern});
     return cases;
 }
 
@@ -168,9 +156,9 @@ void blit(cv::Mat& dst, const cv::Mat& src, int x0, int y0) {
     }
 }
 
-cv::Mat loadOrEmpty(const std::string& path) {
+cv::Mat loadOrEmpty(const fs::path& path) {
     try {
-        return io::loadColor(path);
+        return io::loadColorFile(path);
     } catch (const std::exception&) {
         return cv::Mat();
     }
@@ -261,7 +249,7 @@ struct Outcome {
     double seconds = 0;
 };
 
-std::string fileName(const std::string& p) { return fs::path(p).filename().string(); }
+std::string fileName(const fs::path& p) { return p.filename().u8string(); }
 
 cv::Mat menuScreen(const std::vector<Case>& cases, int sel, const cv::Mat& refThumb,
                    const cv::Mat& userThumb, const std::string& status) {
@@ -275,8 +263,7 @@ cv::Mat menuScreen(const std::vector<Case>& cases, int sel, const cv::Mat& refTh
         if (i == sel) fillRect(img, listX, y, listX + listW, y + rowH, kSelect);
         const viz::Color c = i == sel ? kText : kDim;
         text(img, listX + 12, y + 8, (i < 9 ? " " : "") + std::to_string(i + 1), c);
-        text(img, listX + 60, y + 8, groupOf(cases[i].group).tag, i == sel ? kText : kAccent);
-        text(img, listX + 160, y + 8, fileName(cases[i].user), c);
+        text(img, listX + 70, y + 8, fileName(cases[i].user), c);
     }
     if (cases.empty())
         text(img, listX + 12, top + 8, "DEMO SAMPLES NOT FOUND - PRESS O FOR YOUR OWN PHOTOS", kWarn);
@@ -289,15 +276,11 @@ cv::Mat menuScreen(const std::vector<Case>& cases, int sel, const cv::Mat& refTh
         picture(img, refThumb, px, top + 24, pw, ph);
         picture(img, userThumb, px + pw + 26, top + 24, pw, ph);
         int y = top + 24 + ph + 24;
-        text(img, px, y, "PATTERN   " + c.pattern, kText); y += 30;
-        for (const std::string& line : wrap(groupOf(c.group).description, 40)) {
-            text(img, px, y, line, kAccent); y += 26;
-        }
-        y += 10;
+        text(img, px, y, "PATTERN   " + c.pattern, kText); y += 36;
         text(img, px, y, "REF   " + fileName(c.ref), kDim); y += 26;
         text(img, px, y, "USER  " + fileName(c.user), kDim);
     }
-    footer(img, "W/S MOVE   1-9 JUMP   ENTER SCORE   O OWN PHOTOS   Q QUIT", status);
+    footer(img, "W/S MOVE   ENTER SCORE   O OWN PHOTOS   Q QUIT", status);
     return img;
 }
 
@@ -458,7 +441,7 @@ std::string errorHint(const std::string& stage) {
         return "SHOOT STRAIGHT FROM ABOVE WITH THE WHOLE CUP VISIBLE AND A PLAIN BACKGROUND.";
     if (stage == "pattern size validation")
         return "THE FOAM COVERS TOO MUCH OR TOO LITTLE OF THE CUP COMPARED WITH THE REFERENCE.";
-    if (stage == "load images") return "CHECK THE FILE PATH. PATHS WITH KOREAN LETTERS CANNOT BE READ.";
+    if (stage == "load images") return "CHECK THAT THE FILE IS A PNG / JPG / BMP PHOTO AND STILL EXISTS.";
     return "SEE THE CONSOLE WINDOW FOR DETAILS.";
 }
 
@@ -471,7 +454,7 @@ cv::Mat resultScreen(const Case& c, int index, int count, const Outcome& o, int 
         if (tab == 0) overview(img, o);
         else if (tab == 1) structureTab(img, o);
         else qualityTab(img, o);
-        footer(img, "1/2/3 TAB VIEW   N/P NEXT/PREV   S SAVE   B BACK   Q QUIT", status);
+        footer(img, "1/2/3 TAB VIEW   S SAVE   B BACK   Q QUIT", status);
     } else {
         // Text column ends before the photo at x = 760 (12 px per character).
         int y = 150;
@@ -479,13 +462,9 @@ cv::Mat resultScreen(const Case& c, int index, int count, const Outcome& o, int 
         y += 16;
         for (const std::string& line : wrap(errorHint(o.stage), 56)) { text(img, 40, y, line, kText); y += 28; }
         y += 20;
-        text(img, 40, y, "STEP: " + o.stage, kDim); y += 28;
-        if (c.group == "5_should_fail")
-            for (const std::string& line : wrap("THIS DEMO CASE IS MEANT TO FAIL: THE MESSAGE ABOVE IS THE EXPECTED RESULT.", 56)) {
-                text(img, 40, y, line, kAccent); y += 26;
-            }
+        text(img, 40, y, "STEP: " + o.stage, kDim);
         picture(img, loadOrEmpty(c.user), 760, 140, 380, 380);
-        footer(img, "N/P NEXT/PREV   B BACK   Q QUIT", status);
+        footer(img, "B BACK   Q QUIT", status);
     }
     return img;
 }
@@ -498,7 +477,7 @@ Outcome score(const Case& c) {
     try {
         PatternSpec spec;
         spec.name = c.pattern;
-        const cv::Mat ref = io::loadColor(c.ref), user = io::loadColor(c.user);
+        const cv::Mat ref = io::loadColorFile(c.ref), user = io::loadColorFile(c.user);
         o.r = runPipeline(ref, user, spec, &o.stage);
         viz::printReport(spec, o.r.structure, o.r.quality, o.r.score);
         o.stage = "render result";
@@ -512,24 +491,41 @@ Outcome score(const Case& c) {
     return o;
 }
 
-std::string unquote(std::string s) {
-    while (!s.empty() && (s.back() == ' ' || s.back() == '\r')) s.pop_back();
-    while (!s.empty() && s.front() == ' ') s.erase(s.begin());
-    if (s.size() >= 2 && s.front() == '"' && s.back() == '"') s = s.substr(1, s.size() - 2);
-    return s;
+// Windows standard "Open" dialog. Returns an empty path when cancelled.
+// OFN_NOCHANGEDIR keeps the working directory (where S saves screens).
+fs::path pickFile(const wchar_t* title, const fs::path& startDir) {
+    wchar_t file[4096] = L"";
+    const std::wstring dir = startDir.wstring();
+    OPENFILENAMEW ofn{};
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = FindWindowA(nullptr, kWindow);
+    ofn.lpstrFilter = L"Photos (*.png;*.jpg;*.jpeg;*.bmp)\0*.png;*.jpg;*.jpeg;*.bmp\0All files (*.*)\0*.*\0";
+    ofn.lpstrFile = file;
+    ofn.nMaxFile = static_cast<DWORD>(std::size(file));
+    ofn.lpstrInitialDir = dir.empty() ? nullptr : dir.c_str();
+    ofn.lpstrTitle = title;
+    ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR | OFN_HIDEREADONLY;
+    return GetOpenFileNameW(&ofn) ? fs::path(file) : fs::path();
 }
 
-bool askOwnPhotos(Case& c) {
-    std::printf("\n=== Score your own photos (drag a file into this window to paste its path) ===\n");
-    std::string ref, user, pattern;
-    std::printf("Reference photo path: ");
-    if (!std::getline(std::cin, ref)) return false;
-    std::printf("Your photo path     : ");
-    if (!std::getline(std::cin, user)) return false;
-    std::printf("Pattern name (heart / tulip): ");
-    if (!std::getline(std::cin, pattern)) return false;
-    c = {"own", unquote(ref), unquote(user), unquote(pattern).empty() ? "custom" : unquote(pattern)};
-    return !c.ref.empty() && !c.user.empty();
+// Display name only: "heart" / "tulip" when the file names say so.
+std::string guessPattern(const fs::path& user, const fs::path& ref) {
+    std::string names = user.filename().u8string() + " " + ref.filename().u8string();
+    for (char& ch : names) ch = char(std::tolower(static_cast<unsigned char>(ch)));
+    if (names.find("heart") != std::string::npos) return "heart";
+    if (names.find("tulip") != std::string::npos) return "tulip";
+    return "custom";
+}
+
+bool chooseOwnPhotos(fs::path& lastDir, Case& c) {
+    const fs::path ref = pickFile(L"1 / 2   Choose the REFERENCE photo (expert latte art)", lastDir);
+    if (ref.empty()) return false;
+    lastDir = ref.parent_path();
+    const fs::path user = pickFile(L"2 / 2   Choose the photo to SCORE", lastDir);
+    if (user.empty()) return false;
+    lastDir = user.parent_path();
+    c = {"own", ref, user, guessPattern(user, ref)};
+    return true;
 }
 
 cv::Mat busy(cv::Mat base, const std::string& message) {
@@ -569,8 +565,13 @@ int runUi(const char* exePath, int argc, char** argv) {
     Case active;
     Outcome outcome;
     std::string status;
-    std::map<std::string, cv::Mat> thumbs;  // raw photos are large: load each once
-    auto thumb = [&](const std::string& path) -> const cv::Mat& {
+    // The "Open" dialog starts in pictures/ (team photos), then remembers the
+    // last folder used.
+    std::error_code ec;
+    fs::path lastDir = demo.empty() ? fs::current_path(ec) : demo.parent_path() / "pictures";
+    if (!fs::exists(lastDir, ec)) lastDir = demo;
+    std::map<fs::path, cv::Mat> thumbs;  // raw photos are large: load each once
+    auto thumb = [&](const fs::path& path) -> const cv::Mat& {
         auto it = thumbs.find(path);
         if (it == thumbs.end()) it = thumbs.emplace(path, fitInto(loadOrEmpty(path), 250, 250)).first;
         return it->second;
@@ -608,22 +609,18 @@ int runUi(const char* exePath, int argc, char** argv) {
             const int n = int(cases.size());
             if ((key == 'w' || key == 'k') && n) sel = (sel + n - 1) % n;
             else if ((key == 's' || key == 'j') && n) sel = (sel + 1) % n;
-            else if (key >= '1' && key <= '9' && key - '1' < n) sel = key - '1';
             else if ((key == 13 || key == 10 || key == ' ') && n) run(sel, cases[sel]);
             else if (key == 'o') {
-                io::show(kWindow, busy(frame, "TYPE THE PATHS IN THE CONSOLE"));
+                io::show(kWindow, busy(frame, "CHOOSE THE PHOTOS"));
                 io::waitKey(1);
                 Case own;
-                if (askOwnPhotos(own)) run(-1, own);
+                if (chooseOwnPhotos(lastDir, own)) run(-1, own);
                 else status = "CANCELLED";
             }
         } else {
-            const int n = int(cases.size());
             if (key == 'b' || key == 8 || key == 27) { screen = Screen::Menu; if (current >= 0) sel = current; }
             else if (key >= '1' && key <= '3' && outcome.ok) tab = key - '1';
             else if (key == 9 && outcome.ok) tab = (tab + 1) % 3;
-            else if (key == 'n' && current >= 0 && n) { sel = (current + 1) % n; run(sel, cases[sel]); }
-            else if (key == 'p' && current >= 0 && n) { sel = (current + n - 1) % n; run(sel, cases[sel]); }
             else if (key == 'f' && outcome.ok) io::show("LatteArt - full result", outcome.render);
             else if (key == 's') {
                 const std::string name = "latteart_screen_" + std::to_string(++saved) + ".png";
