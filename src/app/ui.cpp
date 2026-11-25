@@ -272,7 +272,7 @@ cv::Mat menuScreen(const std::vector<Case>& cases, int sel, const cv::Mat& refTh
         text(img, px, y, "REF   " + fileName(c.ref), kDim); y += 26;
         text(img, px, y, "USER  " + fileName(c.user), kDim);
     }
-    footer(img, "W/S MOVE   1-9 JUMP   ENTER SCORE   O OWN PHOTOS   Q QUIT", status);
+    footer(img, "W/S MOVE   ENTER SCORE   O OWN PHOTOS   Q QUIT", status);
     return img;
 }
 
@@ -579,7 +579,6 @@ int runUi(const char* exePath, int argc, char** argv) {
             const int n = int(cases.size());
             if ((key == 'w' || key == 'k') && n) sel = (sel + n - 1) % n;
             else if ((key == 's' || key == 'j') && n) sel = (sel + 1) % n;
-            else if (key >= '1' && key <= '9' && key - '1' < n) sel = key - '1';
             else if ((key == 13 || key == 10 || key == ' ') && n) run(sel, cases[sel]);
             else if (key == 'o') {
                 io::show(kWindow, busy(frame, "TYPE THE PATHS IN THE CONSOLE"));
