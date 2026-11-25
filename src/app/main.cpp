@@ -6,6 +6,7 @@
 //   LatteArt.exe --canon <photo.jpg> <cx> <cy> <r> <out.png>
 //   LatteArt.exe --batch <labels.csv> <photo_dir> <out.csv>
 //   LatteArt.exe --debug <stage> [args...]   (see src/debug/debug.h)
+//   LatteArt.exe [--ui]                       keyboard viewer (see src/app/ui.h)
 #include <cstdio>
 #include <exception>
 #include <stdexcept>
@@ -14,6 +15,7 @@
 
 #include "app/batch.h"
 #include "app/pipeline.h"
+#include "app/ui.h"
 #include "io/io.h"
 #include "normalize/manual.h"
 #include "debug/debug.h"
@@ -42,7 +44,8 @@ void usage() {
         "  LatteArt.exe <reference.jpg> <user.jpg> <pattern[:catalog_layers]> [result.png] [--no-show]\n"
         "  LatteArt.exe --canon <photo.jpg> <cx> <cy> <r> <out.png>\n"
         "  LatteArt.exe --batch <labels.csv> <photo_dir> <out.csv>\n"
-        "  LatteArt.exe --debug <preprocess|normalize|segment|layers|quality|viz> [args...]\n");
+        "  LatteArt.exe --debug <preprocess|normalize|segment|layers|quality|viz> [args...]\n"
+        "  LatteArt.exe [--ui]   (no arguments: keyboard viewer)\n");
 }
 
 int runCanon(int argc, char** argv) {
@@ -111,13 +114,12 @@ int runScore(int argc, char** argv, std::string& stage) {
 }  // namespace
 
 int main(int argc, char** argv) {
-    if (argc < 2) {
-        usage();
-        return 1;
-    }
-    const std::string mode = argv[1];
-    std::string stage = mode;
+    std::string stage = argc < 2 ? "--ui" : argv[1];
     try {
+        // No arguments (double-click, Ctrl+F5 in Visual Studio): open the viewer.
+        if (argc < 2) return la::app::runUi(argv[0], 0, argv + 1);
+        const std::string mode = argv[1];
+        if (mode == "--ui") return la::app::runUi(argv[0], argc - 2, argv + 2);
         if (mode == "--canon") return runCanon(argc, argv);
         if (mode == "--batch") return la::app::runBatch(argc - 2, argv + 2);
         if (mode == "--debug") return runDebug(argc, argv);
