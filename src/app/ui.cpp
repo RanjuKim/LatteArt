@@ -44,26 +44,6 @@ struct Case {
     std::string ref, user, pattern;
 };
 
-struct Group {
-    const char* folder;
-    const char* tag;          // short label in the list
-    const char* description;  // shown under the preview
-};
-const Group kGroups[] = {
-    {"1_high_score", "SAME", "SAME ART: EDITED COPY OF THE REFERENCE"},
-    {"2_layers_merged", "MERGED", "LAYERS MERGED: FOAM MADE THICKER"},
-    {"3_practice_good", "GOOD", "PRACTICE CUP: WELL MADE"},
-    {"4_practice_bad", "POOR", "PRACTICE CUP: POORLY MADE"},
-    {"5_should_fail", "FAIL", "SHOULD FAIL: SHOWS A CLEAR ERROR MESSAGE"},
-    {"own", "OWN", "YOUR OWN PHOTOS"},
-};
-
-const Group& groupOf(const std::string& folder) {
-    for (const Group& g : kGroups)
-        if (folder == g.folder) return g;
-    return kGroups[5];
-}
-
 std::vector<Case> demoCases(const fs::path& demo) {
     const struct { const char *group, *ref, *user, *pattern; } list[] = {
         {"1_high_score", "Pro_Tulip_3.png", "Pro_Tulip_3__scale90.png", "tulip"},
@@ -275,8 +255,7 @@ cv::Mat menuScreen(const std::vector<Case>& cases, int sel, const cv::Mat& refTh
         if (i == sel) fillRect(img, listX, y, listX + listW, y + rowH, kSelect);
         const viz::Color c = i == sel ? kText : kDim;
         text(img, listX + 12, y + 8, (i < 9 ? " " : "") + std::to_string(i + 1), c);
-        text(img, listX + 60, y + 8, groupOf(cases[i].group).tag, i == sel ? kText : kAccent);
-        text(img, listX + 160, y + 8, fileName(cases[i].user), c);
+        text(img, listX + 70, y + 8, fileName(cases[i].user), c);
     }
     if (cases.empty())
         text(img, listX + 12, top + 8, "DEMO SAMPLES NOT FOUND - PRESS O FOR YOUR OWN PHOTOS", kWarn);
@@ -289,11 +268,7 @@ cv::Mat menuScreen(const std::vector<Case>& cases, int sel, const cv::Mat& refTh
         picture(img, refThumb, px, top + 24, pw, ph);
         picture(img, userThumb, px + pw + 26, top + 24, pw, ph);
         int y = top + 24 + ph + 24;
-        text(img, px, y, "PATTERN   " + c.pattern, kText); y += 30;
-        for (const std::string& line : wrap(groupOf(c.group).description, 40)) {
-            text(img, px, y, line, kAccent); y += 26;
-        }
-        y += 10;
+        text(img, px, y, "PATTERN   " + c.pattern, kText); y += 36;
         text(img, px, y, "REF   " + fileName(c.ref), kDim); y += 26;
         text(img, px, y, "USER  " + fileName(c.user), kDim);
     }
@@ -479,11 +454,7 @@ cv::Mat resultScreen(const Case& c, int index, int count, const Outcome& o, int 
         y += 16;
         for (const std::string& line : wrap(errorHint(o.stage), 56)) { text(img, 40, y, line, kText); y += 28; }
         y += 20;
-        text(img, 40, y, "STEP: " + o.stage, kDim); y += 28;
-        if (c.group == "5_should_fail")
-            for (const std::string& line : wrap("THIS DEMO CASE IS MEANT TO FAIL: THE MESSAGE ABOVE IS THE EXPECTED RESULT.", 56)) {
-                text(img, 40, y, line, kAccent); y += 26;
-            }
+        text(img, 40, y, "STEP: " + o.stage, kDim);
         picture(img, loadOrEmpty(c.user), 760, 140, 380, 380);
         footer(img, "N/P NEXT/PREV   B BACK   Q QUIT", status);
     }
