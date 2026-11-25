@@ -6,7 +6,7 @@ $allowedEverywhere = @(
     'Mat', 'Point', 'Point2f', 'Point2i', 'Point2d', 'Size', 'Vec3b', 'Vec3f',
     'Exception'
 )
-$allowedInIo = @('imread', 'imwrite', 'imshow', 'waitKey', 'IMREAD_COLOR', 'IMREAD_GRAYSCALE')
+$allowedInIo = @('imread', 'imdecode', 'imwrite', 'imshow', 'waitKey', 'IMREAD_COLOR', 'IMREAD_GRAYSCALE')
 
 $root = Join-Path $PSScriptRoot '..\src'
 $violations = 0

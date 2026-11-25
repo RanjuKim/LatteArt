@@ -5,10 +5,12 @@
 //   LatteArt.exe --ui
 //   LatteArt.exe --ui --snapshot <dir>   saves every screen as PNG, no window
 //
-// Only OpenCV input/output is used (imshow / waitKey / imread / imwrite through
-// io::). Everything on screen is drawn with our own pixel functions (viz/draw),
-// and the only interaction is the keyboard via waitKey, so the assignment's
-// "OpenCV I/O functions only" rule holds.
+// Only OpenCV input/output is used (imshow / waitKey / imdecode / imwrite
+// through io::). Everything on screen is drawn with our own pixel functions
+// (viz/draw) and the viewer is driven by the keyboard via waitKey, so the
+// assignment's "OpenCV I/O functions only" rule holds. "O" opens the Windows
+// standard file-open dialog (GetOpenFileNameW) to choose your own photos: a
+// GUI-only OS function, not image processing (FAQ Q3: GUI is not restricted).
 #pragma once
 
 namespace la::app {
