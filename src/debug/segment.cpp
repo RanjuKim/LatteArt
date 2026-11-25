@@ -261,6 +261,24 @@ void testSegmentation() {
     std::printf("       (golden crema with dark spots: Michelson %.3f, chroma ratio %.2f)\n", ev.michelson,
                 ev.chromaRatio);
     check(spots.area == 0.f && ev.chromaRatio > 1.f, "golden crema around dark spots is not foam");
+    check(ev.colorChecked, "colored crema -> the color check is used");
+
+    // Achromatic cup (grayscale photo / Jaeku's synthetic test cup): foam 225
+    // on crema 75, no color at all. Both chromas are ~0, so their ratio is
+    // noise and must not reject clear foam (it did before: ratio 2.20).
+    for (int y = 0; y < N; ++y)
+        for (int x = 0; x < N; ++x) {
+            const int dx = x - N / 2, dy = y - N / 2;
+            const bool foamBand = std::abs(y + 0.5f - 256.f) < 15.f && std::abs(x + 0.5f - 256.f) < 95.f;
+            const uchar v = foamBand ? 225 : (dx * dx + dy * dy < 240 * 240 ? 75 : 25);
+            uchar* p = bgr.ptr<uchar>(y) + 3 * x;
+            p[0] = p[1] = p[2] = v;
+        }
+    const PatternMask gray = structure::segmentPattern(normalize::fromCanonicalImage(bgr), &ev);
+    std::printf("       (achromatic cup: Michelson %.3f, edge %.1f px, chroma ratio %.2f, color checked %d)\n",
+                ev.michelson, ev.edgeWidth, ev.chromaRatio, ev.colorChecked);
+    check(!ev.colorChecked && ev.hasFoam && gray.area > 0.f && gray.mask.ptr<uchar>(256)[256] == 255,
+          "achromatic cup: color check skipped, clear foam is found");
 
     // Cup circle 20 px off: a crescent of the white ceramic rim falls inside
     // the mask. It must be dropped, while a pattern touching the edge stays.
@@ -290,8 +308,9 @@ int runSegment(const Args& args) {
     const NormalizedCup cup = normalize::fromCanonicalImage(io::loadColor(args[0]));
     structure::FoamEvidence ev;
     const PatternMask pm = structure::segmentPattern(cup, &ev);
-    std::printf("foam check: foam %.2f, crema %.2f, Michelson %.3f, edge %.1f px, chroma ratio %.2f -> %s\n",
-                ev.foam, ev.crema, ev.michelson, ev.edgeWidth, ev.chromaRatio, ev.hasFoam ? "foam" : "NO FOAM");
+    std::printf("foam check: foam %.2f, crema %.2f, Michelson %.3f, edge %.1f px, chroma ratio %.2f%s -> %s\n",
+                ev.foam, ev.crema, ev.michelson, ev.edgeWidth, ev.chromaRatio,
+                ev.colorChecked ? "" : " (not used: crema has no color)", ev.hasFoam ? "foam" : "NO FOAM");
     io::save("debug_segment_mask.png", pm.mask);
 
     cv::Mat overlay = cup.bgr.clone();
